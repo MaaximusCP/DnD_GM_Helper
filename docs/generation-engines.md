@@ -61,4 +61,4 @@ Per a recompenses, `payload` accepta `items` i `narrative`. Els objectes poden p
 
 ## Fortuna
 
-En mode neutral no s'aplica cap modificador. En mode fortuna, una tirada d20 opcional ajusta quantitats i pot afegir una recompensa narrativa. Una tirada baixa redueix el valor dins d'un interval coherent, però mai buida arbitràriament la recompensa.
+En mode neutral no s'aplica cap modificador. En mode fortuna, una tirada d20 ajusta quantitats i pot afegir una recompensa narrativa. El DM pot deixar que el motor faci la tirada automàticament o introduir manualment el resultat obtingut pels jugadors. La tirada manual es valida entre 1 i 20 i queda desada amb la recompensa. Una tirada baixa redueix el valor dins d'un interval coherent, però mai buida arbitràriament la recompensa.

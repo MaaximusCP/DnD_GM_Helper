@@ -124,7 +124,7 @@ El contingut procedeix de l'SRD 5.1 sota CC-BY-4.0. Consulta [`NOTICE-SRD.md`](N
 
 ## Encounter i Reward Engine
 
-Els dos generadors permeten escollir terreny i dificultat de l'1 al 5. Els encounters també consideren nivell, mida del grup, tipus i estat del món. Les recompenses poden relacionar-se amb l'últim encounter i funcionar en mode neutral o amb tirada de fortuna d20.
+Els dos generadors permeten escollir terreny i dificultat de l'1 al 5. Els encounters també consideren nivell, mida del grup, tipus i estat del món. Les recompenses poden relacionar-se amb l'últim encounter i funcionar sense fortuna, amb una tirada d20 automàtica o amb el resultat introduït manualment perquè els jugadors tirin els daus a taula.
 
 Les opcions inicials són petites deliberadament. Les taules i entrades custom es poden administrar amb els endpoints `/generation-tables` i `/generation-entries`; el format està documentat a [`docs/generation-engines.md`](docs/generation-engines.md).
 

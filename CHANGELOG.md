@@ -1,5 +1,19 @@
 # Registre de canvis
 
+## 2026-08-07 16:58 — Fortuna manual al Reward Engine
+
+Hora: 16:58, Europe/Madrid.
+
+Canvi fet:
+
+- afegides les opcions sense fortuna, tirada d20 automàtica i resultat manual dels jugadors;
+- connectada la tirada manual amb el camp `fortune_roll` ja validat i persistent del backend;
+- incorporada validació visual de l'interval 1–20;
+- mostrada la tirada utilitzada dins del resultat del botí;
+- adaptat el nou control a pantalles petites i actualitzada la documentació.
+
+Motiu: permetre que els jugadors facin físicament la tirada de fortuna i que el DM introdueixi el resultat sense perdre el càlcul contextual ni l'historial de la recompensa.
+
 ## 2026-08-07 16:36 — Versió 0.4.0-local
 
 Hora: 16:36, Europe/Madrid.
