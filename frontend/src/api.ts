@@ -1,14 +1,15 @@
-import type { Dashboard, DocumentResult, Encounter, EventProposal, Knowledge, NPC, NPCCreate, Reward, SearchResult, Session } from './types'
+import type {
+  Campaign, Dashboard, DocumentResult, Encounter, EventProposal, Faction, GenerationEntry,
+  GenerationTable, Knowledge, Location, NPC, NPCCreate, PartySettings, Reward, SearchResult, Session,
+  ReferenceItem, ReferenceSearch,
+} from './types'
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api'
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000/api' : '/api')
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers)
   if (!(options?.body instanceof FormData)) headers.set('Content-Type', 'application/json')
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  })
+  const response = await fetch(`${API_URL}${path}`, { ...options, headers })
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: response.statusText }))
     throw new Error(body.detail ?? 'Error inesperat')
@@ -18,31 +19,52 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  dashboard: () => request<Dashboard>('/campaigns/demo'),
-  analyzeEvent: (description: string, npcId?: string, visibility: 'private'|'witnessed'|'public'='public') => request<EventProposal>('/events/analyze', {
-    method: 'POST', body: JSON.stringify({ campaign_id: 'demo', description, npc_id: npcId || null, visibility }),
+  campaigns: () => request<Campaign[]>('/campaigns'),
+  dashboard: (campaignId: string) => request<Dashboard>(`/campaigns/${campaignId}`),
+  createCampaign: (payload: {name:string; system:string; rules_profile:string; location_name:string}) => request<Campaign>('/campaigns', {method:'POST', body:JSON.stringify(payload)}),
+  updateCampaign: (campaignId:string, payload:Partial<Campaign>) => request<Campaign>(`/campaigns/${campaignId}`, {method:'PATCH', body:JSON.stringify(payload)}),
+  importCampaign: (payload:unknown) => request<Campaign>('/campaigns/import', {method:'POST', body:JSON.stringify(payload)}),
+  analyzeEvent: (campaignId:string, description: string, npcId?: string, visibility: 'private'|'witnessed'|'public'='public') => request<EventProposal>('/events/analyze', {
+    method: 'POST', body: JSON.stringify({ campaign_id: campaignId, description, npc_id: npcId || null, visibility }),
   }),
   applyEvent: (id: string) => request<EventProposal>(`/events/${id}/apply`, { method: 'POST' }),
   updateEvent: (id: string, payload: Partial<EventProposal>) => request<EventProposal>(`/events/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   ignoreEvent: (id: string) => request<EventProposal>(`/events/${id}/ignore`, { method: 'POST' }),
   undoEvent: (id: string) => request<EventProposal>(`/events/${id}/undo`, { method: 'POST' }),
-  startSession: () => request<Session>('/sessions?campaign_id=demo', { method: 'POST' }),
+  startSession: (campaignId:string) => request<Session>(`/sessions?campaign_id=${campaignId}`, { method: 'POST' }),
   endSession: (id: string, summary: string) => request<Session>(`/sessions/${id}/end`, { method: 'POST', body: JSON.stringify({ summary }) }),
-  createNpc: (payload: NPCCreate) => request<NPC>('/npcs?campaign_id=demo', { method: 'POST', body: JSON.stringify(payload) }),
+  createNpc: (campaignId:string, payload: NPCCreate) => request<NPC>(`/npcs?campaign_id=${campaignId}`, { method: 'POST', body: JSON.stringify(payload) }),
   updateNpc: (id: string, payload: Partial<NPCCreate>) => request<NPC>(`/npcs/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteNpc: (id: string) => request<void>(`/npcs/${id}`, { method: 'DELETE' }),
   addMemory: (id: string, text: string) => request(`/npcs/${id}/memories`, { method: 'POST', body: JSON.stringify({ text, importance: 'important' }) }),
-  search: (query: string) => request<SearchResult[]>(`/search?campaign_id=demo&q=${encodeURIComponent(query)}`),
+  search: (campaignId:string, query: string) => request<SearchResult[]>(`/search?campaign_id=${campaignId}&q=${encodeURIComponent(query)}`),
   createBackup: () => request<{ name: string; size: number }>('/backups', { method: 'POST' }),
-  listBackups: () => request<{ name: string; size: number; created_at: string }[]>('/backups'),
-  exportCampaign: () => request<Record<string, unknown>>('/campaigns/demo/export'),
+  exportCampaign: (campaignId:string) => request<Record<string, unknown>>(`/campaigns/${campaignId}/export`),
   uploadDocument: (form: FormData) => request('/library/upload', { method: 'POST', body: form }),
-  searchLibrary: (query: string) => request<DocumentResult[]>(`/library/search?campaign_id=demo&q=${encodeURIComponent(query)}`),
+  deleteDocument: (id:string) => request<void>(`/library/${id}?confirm=true`, {method:'DELETE'}),
+  searchLibrary: (campaignId:string, query: string) => request<DocumentResult[]>(`/library/search?campaign_id=${campaignId}&q=${encodeURIComponent(query)}`),
   knowledge: (npcId: string) => request<Knowledge[]>(`/npcs/${npcId}/knowledge`),
   addKnowledge: (npcId: string, content: string) => request<Knowledge>(`/npcs/${npcId}/knowledge`, { method:'POST', body:JSON.stringify({subject:'Nota del DM',content,confidence:1,truth_status:'fact',source_type:'manual'}) }),
-  generateEncounter: (payload: Record<string, unknown>) => request<Encounter>('/encounters/generate', { method:'POST', body:JSON.stringify({campaign_id:'demo',...payload}) }),
-  generateReward: (payload: Record<string, unknown>) => request<Reward>('/rewards/generate', { method:'POST', body:JSON.stringify({campaign_id:'demo',...payload}) }),
-  chat: (npcId: string, message: string) => request<{ reply: string; context_reasons: string[]; provider: string }>(
-    `/npcs/${npcId}/chat`, { method: 'POST', body: JSON.stringify({ message, situation: 'Conversa durant la sessió', history: [] }) },
-  ),
+  generateEncounter: (campaignId:string, payload: Record<string, unknown>) => request<Encounter>('/encounters/generate', { method:'POST', body:JSON.stringify({campaign_id:campaignId,...payload}) }),
+  generateReward: (campaignId:string, payload: Record<string, unknown>) => request<Reward>('/rewards/generate', { method:'POST', body:JSON.stringify({campaign_id:campaignId,...payload}) }),
+  chat: (npcId: string, message: string) => request<{ reply: string; context_reasons: string[]; provider: string }>(`/npcs/${npcId}/chat`, { method: 'POST', body: JSON.stringify({ message, situation: 'Conversa durant la sessió', history: [] }) }),
+  createLocation: (campaignId:string,payload:{name:string;description:string;terrain:string}) => request<Location>(`/campaigns/${campaignId}/locations`,{method:'POST',body:JSON.stringify(payload)}),
+  updateLocation: (id:string,payload:Partial<Location>) => request<Location>(`/locations/${id}`,{method:'PATCH',body:JSON.stringify(payload)}),
+  deleteLocation: (id:string) => request<void>(`/locations/${id}?confirm=true`,{method:'DELETE'}),
+  createFaction: (campaignId:string,payload:{name:string;description:string}) => request<Faction>(`/campaigns/${campaignId}/factions`,{method:'POST',body:JSON.stringify(payload)}),
+  updateFaction: (id:string,payload:Partial<Faction>) => request<Faction>(`/factions/${id}`,{method:'PATCH',body:JSON.stringify(payload)}),
+  deleteFaction: (id:string) => request<void>(`/factions/${id}?confirm=true`,{method:'DELETE'}),
+  updateParty: (campaignId:string,payload:Omit<PartySettings,'campaign_id'>) => request<PartySettings>(`/campaigns/${campaignId}/party`,{method:'PUT',body:JSON.stringify(payload)}),
+  setWorldState: (campaignId:string,key:string,value:string|number) => request<Record<string,string|number>>(`/campaigns/${campaignId}/world-state/${encodeURIComponent(key)}`,{method:'PUT',body:JSON.stringify({value})}),
+  deleteWorldState: (campaignId:string,key:string) => request<void>(`/campaigns/${campaignId}/world-state/${encodeURIComponent(key)}?confirm=true`,{method:'DELETE'}),
+  tables: (campaignId:string) => request<GenerationTable[]>(`/generation-tables?campaign_id=${campaignId}`),
+  createTable: (campaignId:string,payload:{kind:'encounter'|'reward';name:string;description:string}) => request<GenerationTable>('/generation-tables',{method:'POST',body:JSON.stringify({campaign_id:campaignId,...payload})}),
+  deleteTable: (id:string) => request<void>(`/generation-tables/${id}?confirm=true`,{method:'DELETE'}),
+  entries: (tableId:string) => request<GenerationEntry[]>(`/generation-tables/${tableId}/entries`),
+  createEntry: (tableId:string,payload:Omit<GenerationEntry,'id'|'table_id'>) => request<GenerationEntry>(`/generation-tables/${tableId}/entries`,{method:'POST',body:JSON.stringify(payload)}),
+  updateEntry: (id:string,payload:Omit<GenerationEntry,'id'|'table_id'>) => request<GenerationEntry>(`/generation-entries/${id}`,{method:'PUT',body:JSON.stringify(payload)}),
+  deleteEntry: (id:string) => request<void>(`/generation-entries/${id}?confirm=true`,{method:'DELETE'}),
+  reference: (query:string,category:string,offset=0) => request<ReferenceSearch>(`/reference?q=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}&limit=50&offset=${offset}`),
+  referenceItem: (id:string) => request<ReferenceItem>(`/reference/item/${encodeURIComponent(id)}`),
+  referenceMeta: () => request<{counts:Record<string,number>;license:string;dataset:string}>('/reference/meta'),
 }

@@ -1,4 +1,4 @@
-# API local 0.3
+# API local 0.4
 
 Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interactiva completa a `/docs`.
 
@@ -12,7 +12,11 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `GET` | `/campaigns/{id}/export` | Exporta un paquet JSON portable |
 | `POST` | `/campaigns/import` | Importa un paquet JSON; mai sobreescriu un ID existent |
 | `POST` | `/campaigns/{id}/locations` | Crea una localització |
+| `PATCH/DELETE` | `/locations/{id}` | Edita o elimina una localització no activa |
 | `POST` | `/campaigns/{id}/factions` | Crea una facció |
+| `PATCH/DELETE` | `/factions/{id}` | Edita o elimina una facció |
+| `GET/PUT` | `/campaigns/{id}/party` | Consulta o configura nivell, mida i notes del grup |
+| `PUT/DELETE` | `/campaigns/{id}/world-state/{key}` | Administra variables custom del món |
 | `POST` | `/sessions?campaign_id=demo` | Comença una sessió |
 | `GET` | `/sessions?campaign_id=demo` | Historial de sessions |
 | `POST` | `/sessions/{id}/end` | Finalitza una sessió i en desa el resum |
@@ -40,12 +44,16 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `GET/POST` | `/rumors` | Consulta o crea rumors |
 | `POST` | `/rumors/{id}/propagate` | Propaga el rumor idempotentment als NPC |
 | `GET/POST` | `/generation-tables` | Llista o crea taules homebrew |
+| `PATCH/DELETE` | `/generation-tables/{id}` | Edita o elimina una taula i les entrades associades |
 | `GET/POST` | `/generation-tables/{id}/entries` | Llista o afegeix opcions contextuals |
 | `PUT/DELETE` | `/generation-entries/{id}` | Edita o elimina una opció custom |
 | `GET` | `/encounters` | Historial d'encounters generats |
 | `POST` | `/encounters/generate` | Genera i desa un encounter contextual |
 | `GET` | `/rewards` | Historial de recompenses |
 | `POST` | `/rewards/generate` | Genera i desa una recompensa contextual |
+| `GET` | `/reference/meta` | Versió, llicència i recompte del catàleg SRD local |
+| `GET` | `/reference?category=...&q=...` | Cerca paginada al catàleg SRD |
+| `GET` | `/reference/item/{id}` | Fitxa estructurada completa d'una entrada SRD |
 
 Exemple per analitzar un fet:
 

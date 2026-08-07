@@ -104,6 +104,77 @@ class APITests(unittest.TestCase):
         self.assertEqual(reward.status_code, 201)
         self.assertEqual(reward.json()["terrain"], "jungle")
 
+    def test_campaign_studio_world_party_and_custom_tables(self):
+        created = self.client.post("/api/campaigns", json={
+            "name": "Campanya pròpia", "system": "dnd5e",
+            "rules_profile": "campaign_default", "location_name": "Vila inicial",
+        })
+        self.assertEqual(created.status_code, 201)
+        campaign = created.json()
+        campaign_id = campaign["id"]
+        original_location = campaign["current_location_id"]
+
+        dashboard = self.client.get(f"/api/campaigns/{campaign_id}")
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertEqual(dashboard.json()["party"]["level"], 3)
+        self.assertEqual(dashboard.json()["generation_tables"], [])
+
+        party = self.client.put(f"/api/campaigns/{campaign_id}/party", json={
+            "name": "Companyia del Sol", "level": 6, "size": 5, "notes": "Sense clergue",
+        })
+        self.assertEqual(party.json()["level"], 6)
+
+        location = self.client.post(f"/api/campaigns/{campaign_id}/locations", json={
+            "name": "Temple enfonsat", "description": "Ruïnes sota la selva", "terrain": "ruins",
+        })
+        location_id = location.json()["id"]
+        edited = self.client.patch(f"/api/locations/{location_id}", json={"terrain": "dungeon"})
+        self.assertEqual(edited.json()["terrain"], "dungeon")
+        self.assertEqual(self.client.patch(f"/api/campaigns/{campaign_id}", json={
+            "current_location_id": location_id, "current_day": 4,
+        }).status_code, 200)
+        self.assertEqual(self.client.delete(f"/api/locations/{original_location}?confirm=true").status_code, 204)
+
+        faction = self.client.post(f"/api/campaigns/{campaign_id}/factions", json={
+            "name": "Cartògrafs", "description": "Exploren les ruïnes",
+        })
+        faction_id = faction.json()["id"]
+        self.assertEqual(self.client.patch(f"/api/factions/{faction_id}", json={
+            "description": "Exploren i protegeixen les ruïnes",
+        }).status_code, 200)
+        state = self.client.put(f"/api/campaigns/{campaign_id}/world-state/clima", json={"value": "tempesta"})
+        self.assertEqual(state.json()["clima"], "tempesta")
+        self.assertEqual(self.client.delete(f"/api/campaigns/{campaign_id}/world-state/clima?confirm=true").status_code, 204)
+
+        table = self.client.post("/api/generation-tables", json={
+            "campaign_id": campaign_id, "kind": "encounter", "name": "Ruïnes pròpies",
+        })
+        table_id = table.json()["id"]
+        entry = self.client.post(f"/api/generation-tables/{table_id}/entries", json={
+            "terrains": ["dungeon"], "min_level": 2, "max_level": 8,
+            "min_difficulty": 2, "max_difficulty": 5, "weight": 3,
+            "title": "Guardià adormit", "payload": {"type": "combat"}, "tags": ["homebrew"],
+        })
+        self.assertEqual(entry.status_code, 201)
+        self.assertEqual(len(self.client.get(f"/api/generation-tables/{table_id}/entries").json()), 1)
+        self.assertEqual(self.client.delete(f"/api/generation-tables/{table_id}?confirm=true").status_code, 204)
+        self.assertEqual(self.client.patch(f"/api/campaigns/{campaign_id}", json={"archived": True}).json()["archived"], True)
+
+    def test_local_srd_reference_catalog(self):
+        metadata = self.client.get("/api/reference/meta")
+        self.assertEqual(metadata.status_code, 200)
+        self.assertEqual(metadata.json()["license"], "CC-BY-4.0")
+        self.assertEqual(metadata.json()["counts"]["magic-items"], 362)
+        results = self.client.get("/api/reference", params={
+            "category": "magic-items", "q": "Bag of Holding", "limit": 10,
+        })
+        self.assertEqual(results.status_code, 200)
+        self.assertGreaterEqual(results.json()["total"], 1)
+        item = results.json()["items"][0]
+        detail = self.client.get(f"/api/reference/item/{item['id']}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["license"], "CC-BY-4.0")
+
 
 if __name__ == "__main__":
     unittest.main()

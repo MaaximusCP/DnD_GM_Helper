@@ -25,6 +25,17 @@ Campanya + kind
 
 Terrenys inicials: `urban`, `forest`, `jungle`, `dungeon`, `ruins`, `coast`, `river`, `swamp`, `mountain`, `desert` i `other`.
 
+## Catàleg SRD integrat
+
+El motor consulta localment `backend/app/data/srd5e_2014.json`, sense fer peticions durant la partida:
+
+- un encounter de combat o mixt rep una proposta de monstre SRD filtrada per CR orientatiu, mida del grup, dificultat i família de criatura coherent amb el terreny;
+- una recompensa que contingui el marcador `Consumible apropiat al nivell` es concreta amb un objecte màgic SRD d'una raresa adequada al nivell i la dificultat;
+- cada proposta conserva `reference_id`, font i llicència;
+- qualsevol fitxa del catàleg es pot afegir manualment a una taula custom des de la UI.
+
+Aquest suport amplia les opcions inicials, però no substitueix un balanceig exhaustiu de CR/XP ni incorpora contingut fora de l'SRD.
+
 ## Entrada custom d'example
 
 ```json
@@ -51,4 +62,3 @@ Per a recompenses, `payload` accepta `items` i `narrative`. Els objectes poden p
 ## Fortuna
 
 En mode neutral no s'aplica cap modificador. En mode fortuna, una tirada d20 opcional ajusta quantitats i pot afegir una recompensa narrativa. Una tirada baixa redueix el valor dins d'un interval coherent, però mai buida arbitràriament la recompensa.
-

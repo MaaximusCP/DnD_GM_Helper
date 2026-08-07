@@ -11,16 +11,18 @@ from app.application.rumor_service import RumorService
 from app.config import Settings, get_settings
 from app.domain.models import (
     CampaignBundle, CampaignCreate, CampaignUpdate, EventAnalyzeRequest, EventProposal,
-    EventUpdate, FactionCreate, LocationCreate, MemoryCreate, NPCCreate, NPCChatRequest,
+    EventUpdate, FactionCreate, FactionUpdate, LocationCreate, LocationUpdate,
+    MemoryCreate, NPCCreate, NPCChatRequest,
     NPCChatResponse, NPCUpdate, SessionEndRequest,
-    RestoreBackupRequest,
-    EncounterRequest, GenerationEntryCreate, GenerationTableCreate, KnowledgeCreate,
-    RewardRequest, RumorCreate,
+    RestoreBackupRequest, PartySettingsUpdate, WorldStateUpdate,
+    EncounterRequest, GenerationEntryCreate, GenerationTableCreate,
+    GenerationTableUpdate, KnowledgeCreate, RewardRequest, RumorCreate,
 )
 from app.infrastructure.content_repository import ContentRepository
 from app.infrastructure.database import Database
 from app.infrastructure.llm import create_provider
 from app.infrastructure.repository import SQLiteRepository
+from app.infrastructure.reference_catalog import ReferenceCatalog
 from app.infrastructure.simulation_repository import SimulationRepository
 
 
@@ -64,6 +66,7 @@ def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_r
         "location": repository.get_location(campaign.current_location_id),
         "locations": repository.list_locations(campaign_id),
         "world_state": repository.get_world_state(campaign_id),
+        "party": repository.get_party_settings(campaign_id),
         "npcs": repository.list_npcs(campaign_id),
         "factions": repository.list_factions(campaign_id),
         "events": repository.list_events(campaign_id),
@@ -72,6 +75,7 @@ def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_r
         "rumors": SimulationRepository(repository.database).list_rumors(campaign_id),
         "encounters": SimulationRepository(repository.database).list_encounters(campaign_id),
         "rewards": SimulationRepository(repository.database).list_rewards(campaign_id),
+        "generation_tables": SimulationRepository(repository.database).list_tables(campaign_id),
     }
 
 
@@ -93,11 +97,86 @@ def create_location(campaign_id: str, payload: LocationCreate, repository: SQLit
     return repository.create_location(campaign_id, payload)
 
 
+@router.patch("/locations/{location_id}")
+def update_location(location_id: str, payload: LocationUpdate, repository: SQLiteRepository = Depends(get_repository)):
+    item = repository.update_location(location_id, payload)
+    if not item:
+        raise HTTPException(status_code=404, detail="Localització no trobada")
+    return item
+
+
+@router.delete("/locations/{location_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_location(location_id: str, confirm: bool = False, repository: SQLiteRepository = Depends(get_repository)):
+    if not confirm:
+        raise HTTPException(status_code=409, detail="Cal confirm=true per eliminar la localització")
+    try:
+        deleted = repository.delete_location(location_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Localització no trobada")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post("/campaigns/{campaign_id}/factions", status_code=status.HTTP_201_CREATED)
 def create_faction(campaign_id: str, payload: FactionCreate, repository: SQLiteRepository = Depends(get_repository)):
     if not repository.get_campaign(campaign_id):
         raise HTTPException(status_code=404, detail="Campanya no trobada")
     return repository.create_faction(campaign_id, payload)
+
+
+@router.patch("/factions/{faction_id}")
+def update_faction(faction_id: str, payload: FactionUpdate, repository: SQLiteRepository = Depends(get_repository)):
+    item = repository.update_faction(faction_id, payload)
+    if not item:
+        raise HTTPException(status_code=404, detail="Facció no trobada")
+    return item
+
+
+@router.delete("/factions/{faction_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_faction(faction_id: str, confirm: bool = False, repository: SQLiteRepository = Depends(get_repository)):
+    if not confirm:
+        raise HTTPException(status_code=409, detail="Cal confirm=true per eliminar la facció")
+    if not repository.delete_faction(faction_id):
+        raise HTTPException(status_code=404, detail="Facció no trobada")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/campaigns/{campaign_id}/party")
+def get_party(campaign_id: str, repository: SQLiteRepository = Depends(get_repository)):
+    if not repository.get_campaign(campaign_id):
+        raise HTTPException(status_code=404, detail="Campanya no trobada")
+    return repository.get_party_settings(campaign_id)
+
+
+@router.put("/campaigns/{campaign_id}/party")
+def update_party(campaign_id: str, payload: PartySettingsUpdate, repository: SQLiteRepository = Depends(get_repository)):
+    if not repository.get_campaign(campaign_id):
+        raise HTTPException(status_code=404, detail="Campanya no trobada")
+    return repository.update_party_settings(campaign_id, payload)
+
+
+@router.put("/campaigns/{campaign_id}/world-state/{key}")
+def set_world_state(campaign_id: str, key: str, payload: WorldStateUpdate, repository: SQLiteRepository = Depends(get_repository)):
+    if not repository.get_campaign(campaign_id):
+        raise HTTPException(status_code=404, detail="Campanya no trobada")
+    try:
+        return repository.set_world_state(campaign_id, key, payload.value)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.delete("/campaigns/{campaign_id}/world-state/{key}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_world_state(campaign_id: str, key: str, confirm: bool = False, repository: SQLiteRepository = Depends(get_repository)):
+    if not confirm:
+        raise HTTPException(status_code=409, detail="Cal confirm=true per eliminar la variable")
+    try:
+        deleted = repository.delete_world_state(campaign_id, key)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Variable no trobada")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/campaigns/{campaign_id}/export")
@@ -313,6 +392,27 @@ def public_settings(settings: Settings = Depends(get_settings)):
     return {"llm_provider": settings.llm_provider, "llm_base_url": settings.llm_base_url, "llm_model": settings.llm_model, "database_file": Path(settings.database_path).name}
 
 
+@router.get("/reference")
+def search_reference(q: str = "", category: str | None = None, tag: str | None = None,
+                     limit: int = 50, offset: int = 0):
+    if limit < 1 or limit > 100 or offset < 0:
+        raise HTTPException(status_code=422, detail="Paginació no vàlida")
+    return ReferenceCatalog().search(q, category, tag, limit, offset)
+
+
+@router.get("/reference/meta")
+def reference_metadata():
+    return ReferenceCatalog().metadata()
+
+
+@router.get("/reference/item/{item_id:path}")
+def get_reference_item(item_id: str):
+    item = ReferenceCatalog().get(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Entrada SRD no trobada")
+    return item
+
+
 @router.get("/library")
 def list_library(campaign_id: str = "demo", repository: ContentRepository = Depends(get_content_repository)):
     return repository.list_sources(campaign_id)
@@ -396,6 +496,23 @@ def list_generation_tables(campaign_id: str = "demo", kind: str | None = None, r
 @router.post("/generation-tables", status_code=status.HTTP_201_CREATED)
 def create_generation_table(payload: GenerationTableCreate, repository: SimulationRepository = Depends(get_simulation_repository)):
     return repository.create_table(payload)
+
+
+@router.patch("/generation-tables/{table_id}")
+def update_generation_table(table_id: str, payload: GenerationTableUpdate, repository: SimulationRepository = Depends(get_simulation_repository)):
+    item = repository.update_table(table_id, payload)
+    if not item:
+        raise HTTPException(status_code=404, detail="Taula no trobada")
+    return item
+
+
+@router.delete("/generation-tables/{table_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_generation_table(table_id: str, confirm: bool = False, repository: SimulationRepository = Depends(get_simulation_repository)):
+    if not confirm:
+        raise HTTPException(status_code=409, detail="Cal confirm=true per eliminar la taula")
+    if not repository.delete_table(table_id):
+        raise HTTPException(status_code=404, detail="Taula no trobada")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/generation-tables/{table_id}/entries", status_code=status.HTTP_201_CREATED)

@@ -3,7 +3,8 @@ from uuid import uuid4
 
 from app.domain.models import (
     Encounter, GenerationEntry, GenerationEntryCreate, GenerationTable,
-    GenerationTableCreate, Knowledge, KnowledgeCreate, Reward, Rumor, RumorCreate, utc_now,
+    GenerationTableCreate, GenerationTableUpdate, Knowledge, KnowledgeCreate,
+    Reward, Rumor, RumorCreate, utc_now,
 )
 from app.infrastructure.database import Database
 
@@ -72,6 +73,29 @@ class SimulationRepository:
             db.execute("INSERT INTO generation_tables VALUES (?, ?, ?, ?, ?, ?)", (item.id, item.campaign_id, item.kind, item.name, item.description, item.created_at))
         return item
 
+    def get_table(self, table_id: str) -> GenerationTable | None:
+        with self.database.connect() as db:
+            row = db.execute("SELECT * FROM generation_tables WHERE id=?", (table_id,)).fetchone()
+            return GenerationTable(**dict(row)) if row else None
+
+    def update_table(self, table_id: str, payload: GenerationTableUpdate) -> GenerationTable | None:
+        if not self.get_table(table_id):
+            return None
+        values = payload.model_dump(exclude_none=True)
+        if values:
+            assignments = ", ".join(f"{key}=?" for key in values)
+            with self.database.connect() as db:
+                db.execute(f"UPDATE generation_tables SET {assignments} WHERE id=?", (*values.values(), table_id))
+        return self.get_table(table_id)
+
+    def delete_table(self, table_id: str) -> bool:
+        if not self.get_table(table_id):
+            return False
+        with self.database.connect() as db:
+            db.execute("DELETE FROM generation_entries WHERE table_id=?", (table_id,))
+            db.execute("DELETE FROM generation_tables WHERE id=?", (table_id,))
+        return True
+
     def list_tables(self, campaign_id: str, kind: str | None = None) -> list[GenerationTable]:
         with self.database.connect() as db:
             if kind:
@@ -81,6 +105,10 @@ class SimulationRepository:
             return [GenerationTable(**dict(row)) for row in rows]
 
     def add_entry(self, table_id: str, payload: GenerationEntryCreate) -> GenerationEntry:
+        if not self.get_table(table_id):
+            raise ValueError("Taula no trobada")
+        if payload.min_level > payload.max_level or payload.min_difficulty > payload.max_difficulty:
+            raise ValueError("Els rangs mínims no poden superar els màxims")
         item = GenerationEntry(id=f"entry_{uuid4().hex[:12]}", table_id=table_id, **payload.model_dump())
         with self.database.connect() as db:
             db.execute("INSERT INTO generation_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (
@@ -91,6 +119,8 @@ class SimulationRepository:
         return item
 
     def update_entry(self, entry_id: str, payload: GenerationEntryCreate) -> GenerationEntry | None:
+        if payload.min_level > payload.max_level or payload.min_difficulty > payload.max_difficulty:
+            raise ValueError("Els rangs mínims no poden superar els màxims")
         with self.database.connect() as db:
             if not db.execute("SELECT 1 FROM generation_entries WHERE id=?", (entry_id,)).fetchone():
                 return None

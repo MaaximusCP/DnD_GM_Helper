@@ -10,7 +10,12 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, system TEXT NOT NULL,
     rules_profile TEXT NOT NULL, current_day INTEGER NOT NULL,
-    current_location_id TEXT NOT NULL
+    current_location_id TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS party_settings (
+    campaign_id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT 'Grup d''aventurers',
+    level INTEGER NOT NULL DEFAULT 3, size INTEGER NOT NULL DEFAULT 4,
+    notes TEXT NOT NULL DEFAULT '', FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 CREATE TABLE IF NOT EXISTS locations (
     id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, name TEXT NOT NULL,
@@ -134,6 +139,16 @@ class Database:
             source_columns = {row["name"] for row in connection.execute("PRAGMA table_info(content_sources)")}
             if "asset_kind" not in source_columns:
                 connection.execute("ALTER TABLE content_sources ADD COLUMN asset_kind TEXT NOT NULL DEFAULT 'document'")
+            campaign_columns = {row["name"] for row in connection.execute("PRAGMA table_info(campaigns)")}
+            if "archived" not in campaign_columns:
+                connection.execute("ALTER TABLE campaigns ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+            connection.execute("""CREATE TABLE IF NOT EXISTS party_settings (
+                campaign_id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT 'Grup d''aventurers',
+                level INTEGER NOT NULL DEFAULT 3, size INTEGER NOT NULL DEFAULT 4,
+                notes TEXT NOT NULL DEFAULT '', FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+            )""")
+            connection.execute("""INSERT OR IGNORE INTO party_settings(campaign_id)
+                                  SELECT id FROM campaigns""")
             self._seed(connection)
             self._seed_generation(connection)
 
@@ -154,7 +169,7 @@ class Database:
         if db.execute("SELECT 1 FROM campaigns LIMIT 1").fetchone():
             return
         db.execute(
-            "INSERT INTO campaigns VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO campaigns(id, name, system, rules_profile, current_day, current_location_id) VALUES (?, ?, ?, ?, ?, ?)",
             ("demo", "Expedició de la Jungla", "dnd5e", "campaign_default", 1, "port_verd"),
         )
         db.execute(

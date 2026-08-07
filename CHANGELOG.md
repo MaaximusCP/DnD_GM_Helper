@@ -1,5 +1,25 @@
 # Registre de canvis
 
+## 2026-08-07 16:36 — Versió 0.4.0-local
+
+Hora: 16:36, Europe/Madrid.
+
+Canvi fet:
+
+- eliminades totes les dependències rígides de la campanya `demo` al frontend;
+- incorporats selector, creació, importació i arxiu de múltiples campanyes;
+- afegits editors persistents de campanya, grup, localitzacions, faccions i variables del món;
+- completat el CRUD backend de localitzacions, faccions, estat del món i taules custom;
+- creada una interfície visual per administrar taules homebrew i filtres contextuals;
+- descarregat i incorporat un catàleg local de 1.252 entrades de l'SRD 5.1 sota CC-BY-4.0;
+- afegida cerca local de 362 objectes màgics, 237 equipaments, 334 monstres i 319 encanteris;
+- integrat el catàleg SRD amb els generadors d'encounters i recompenses;
+- afegida conversió d'entrades SRD a opcions de taules custom;
+- documentada l'atribució a `NOTICE-SRD.md` i creat un importador reproduïble;
+- ampliada la suite a 14 proves, amb lint, compilació Python i build TypeScript validats.
+
+Motiu: convertir la vertical slice en una eina multicampanya operable i oferir un corpus ampli de regles i contingut legalment redistribuïble sense dependre d'Internet ni de serveis externs.
+
 ## 2026-08-07 14:33 — Versió 0.3.0-local
 
 Hora: 14:33, Europe/Madrid.

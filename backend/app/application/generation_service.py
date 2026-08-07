@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from app.domain.models import Encounter, EncounterRequest, Reward, RewardRequest
 from app.infrastructure.repository import SQLiteRepository
+from app.infrastructure.reference_catalog import ReferenceCatalog
 from app.infrastructure.simulation_repository import SimulationRepository
 
 
@@ -11,6 +12,7 @@ class GenerationService:
     def __init__(self, repository: SimulationRepository, world_repository: SQLiteRepository):
         self.repository = repository
         self.world_repository = world_repository
+        self.catalog = ReferenceCatalog()
 
     def _terrain(self, campaign_id: str, location_id: str | None, explicit: str | None) -> tuple[str, str | None, list[str]]:
         reasons: list[str] = []
@@ -57,6 +59,12 @@ class GenerationService:
             reasons.append(f"El grup té nivell de cerca {wanted}")
         reasons.extend([f"Dificultat {request.difficulty}/5", f"Grup de {request.party_size} personatges de nivell {request.party_level}"])
         complications = list(entry.payload.get("complications", []))
+        if selected_type in {"combat", "mixed"}:
+            creature = self.catalog.monster_for_level(request.party_level, request.party_size, request.difficulty, terrain)
+            if creature:
+                cr = creature["data"].get("challenge_rating", "?")
+                complications.append(f"Adversari SRD suggerit: {creature['name']} (CR {cr})")
+                reasons.append("Adversari seleccionat del catàleg local SRD 5.1")
         complications.append(f"DC orientativa principal: {10 + request.difficulty + request.party_level // 4}")
         if wanted >= 2 and terrain == "urban":
             complications.append("Una patrulla pot reconèixer el grup")
@@ -105,6 +113,13 @@ class GenerationService:
         items = []
         for raw in entry.payload.get("items", []):
             item = dict(raw)
+            if "apropiat al nivell" in str(item.get("name", "")).casefold():
+                reference = self.catalog.reward_for_level(request.party_level, request.difficulty)
+                if reference:
+                    rarity = reference["data"].get("rarity", {}).get("name", "SRD")
+                    item.update({"name": reference["name"], "category": "magic-item", "rarity": rarity,
+                                 "reference_id": reference["id"], "source": reference["source"]})
+                    reasons.append("Objecte concret seleccionat del catàleg local SRD 5.1")
             if isinstance(item.get("quantity"), (int, float)):
                 item["quantity"] = max(1, round(item["quantity"] * multiplier))
             items.append(item)

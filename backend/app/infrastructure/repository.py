@@ -4,8 +4,9 @@ from uuid import uuid4
 
 from app.domain.models import (
     Campaign, CampaignBundle, CampaignCreate, CampaignImport, CampaignUpdate, EventProposal, EventUpdate,
-    Faction, FactionCreate, Location, LocationCreate, Memory, MemoryCreate, NPC,
-    NPCCreate, NPCUpdate, Relationship, SearchResult, Session, utc_now,
+    Faction, FactionCreate, FactionUpdate, Location, LocationCreate, LocationUpdate,
+    Memory, MemoryCreate, NPC, NPCCreate, NPCUpdate, PartySettings,
+    PartySettingsUpdate, Relationship, SearchResult, Session, utc_now,
 )
 from app.infrastructure.database import Database
 
@@ -32,9 +33,11 @@ class SQLiteRepository:
         campaign_id = f"campaign_{self._slug(payload.name)}_{uuid4().hex[:6]}"
         location_id = f"location_{self._slug(payload.location_name)}_{uuid4().hex[:6]}"
         with self.database.connect() as db:
-            db.execute("INSERT INTO campaigns VALUES (?, ?, ?, ?, 1, ?)", (campaign_id, payload.name, payload.system, payload.rules_profile, location_id))
+            db.execute("""INSERT INTO campaigns(id, name, system, rules_profile, current_day, current_location_id)
+                          VALUES (?, ?, ?, ?, 1, ?)""", (campaign_id, payload.name, payload.system, payload.rules_profile, location_id))
             db.execute("INSERT INTO locations(id, campaign_id, name, description, terrain) VALUES (?, ?, ?, '', 'urban')", (location_id, campaign_id, payload.location_name))
             db.execute("INSERT INTO world_state VALUES (?, 'wanted_level', '0')", (campaign_id,))
+            db.execute("INSERT INTO party_settings(campaign_id) VALUES (?)", (campaign_id,))
         return self.get_campaign(campaign_id)  # type: ignore[return-value]
 
     def update_campaign(self, campaign_id: str, payload: CampaignUpdate) -> Campaign | None:
@@ -47,7 +50,7 @@ class SQLiteRepository:
             if not location or location.campaign_id != campaign_id:
                 raise ValueError("La localització no pertany a aquesta campanya")
         if values:
-            allowed = {"name", "current_day", "current_location_id", "rules_profile"}
+            allowed = {"name", "current_day", "current_location_id", "rules_profile", "archived"}
             assignments = ", ".join(f"{key} = ?" for key in values if key in allowed)
             parameters = [values[key] for key in values if key in allowed]
             with self.database.connect() as db:
@@ -69,6 +72,30 @@ class SQLiteRepository:
             db.execute("INSERT INTO locations(id, campaign_id, name, description, terrain) VALUES (?, ?, ?, ?, ?)", (item.id, item.campaign_id, item.name, item.description, item.terrain))
         return item
 
+    def update_location(self, location_id: str, payload: LocationUpdate) -> Location | None:
+        current = self.get_location(location_id)
+        if not current:
+            return None
+        values = payload.model_dump(exclude_none=True)
+        if values:
+            assignments = ", ".join(f"{key} = ?" for key in values)
+            with self.database.connect() as db:
+                db.execute(f"UPDATE locations SET {assignments} WHERE id = ?", (*values.values(), location_id))
+        return self.get_location(location_id)
+
+    def delete_location(self, location_id: str) -> bool:
+        location = self.get_location(location_id)
+        if not location:
+            return False
+        campaign = self.get_campaign(location.campaign_id)
+        if campaign and campaign.current_location_id == location_id:
+            raise ValueError("No es pot eliminar la localització activa")
+        with self.database.connect() as db:
+            if db.execute("SELECT 1 FROM npcs WHERE location_id=? LIMIT 1", (location_id,)).fetchone():
+                raise ValueError("Mou els NPC a una altra localització abans d'eliminar-la")
+            db.execute("DELETE FROM locations WHERE id=?", (location_id,))
+        return True
+
     def list_factions(self, campaign_id: str) -> list[Faction]:
         with self.database.connect() as db:
             rows = db.execute("SELECT * FROM factions WHERE campaign_id = ? ORDER BY name", (campaign_id,))
@@ -85,6 +112,27 @@ class SQLiteRepository:
             db.execute("INSERT INTO factions VALUES (?, ?, ?, ?)", (item.id, item.campaign_id, item.name, item.description))
             db.execute("INSERT INTO world_state VALUES (?, ?, '0')", (campaign_id, f"reputation:{item.id}"))
         return item
+
+    def update_faction(self, faction_id: str, payload: FactionUpdate) -> Faction | None:
+        current = self.get_faction(faction_id)
+        if not current:
+            return None
+        values = payload.model_dump(exclude_none=True)
+        if values:
+            assignments = ", ".join(f"{key} = ?" for key in values)
+            with self.database.connect() as db:
+                db.execute(f"UPDATE factions SET {assignments} WHERE id = ?", (*values.values(), faction_id))
+        return self.get_faction(faction_id)
+
+    def delete_faction(self, faction_id: str) -> bool:
+        faction = self.get_faction(faction_id)
+        if not faction:
+            return False
+        with self.database.connect() as db:
+            db.execute("UPDATE npcs SET faction_id=NULL WHERE faction_id=?", (faction_id,))
+            db.execute("DELETE FROM world_state WHERE campaign_id=? AND key=?", (faction.campaign_id, f"reputation:{faction_id}"))
+            db.execute("DELETE FROM factions WHERE id=?", (faction_id,))
+        return True
 
     def list_npcs(self, campaign_id: str) -> list[NPC]:
         with self.database.connect() as db:
@@ -278,6 +326,42 @@ class SQLiteRepository:
                     result[row["key"]] = row["value"]
             return result
 
+    def set_world_state(self, campaign_id: str, key: str, value: int | str) -> dict[str, int | str]:
+        normalized = key.strip()
+        if len(normalized) < 2:
+            raise ValueError("La clau ha de tenir almenys dos caràcters")
+        if len(str(value)) > 1000:
+            raise ValueError("El valor no pot superar els 1.000 caràcters")
+        with self.database.connect() as db:
+            db.execute("""INSERT INTO world_state(campaign_id, key, value) VALUES (?, ?, ?)
+                          ON CONFLICT(campaign_id, key) DO UPDATE SET value=excluded.value""",
+                       (campaign_id, normalized, str(value)))
+        return self.get_world_state(campaign_id)
+
+    def delete_world_state(self, campaign_id: str, key: str) -> bool:
+        if key == "wanted_level" or key.startswith("reputation:"):
+            raise ValueError("Aquesta variable és gestionada pel motor")
+        with self.database.connect() as db:
+            cursor = db.execute("DELETE FROM world_state WHERE campaign_id=? AND key=?", (campaign_id, key))
+            return cursor.rowcount > 0
+
+    def get_party_settings(self, campaign_id: str) -> PartySettings:
+        with self.database.connect() as db:
+            row = db.execute("SELECT * FROM party_settings WHERE campaign_id=?", (campaign_id,)).fetchone()
+            if not row:
+                db.execute("INSERT INTO party_settings(campaign_id) VALUES (?)", (campaign_id,))
+                row = db.execute("SELECT * FROM party_settings WHERE campaign_id=?", (campaign_id,)).fetchone()
+            return PartySettings(**dict(row))
+
+    def update_party_settings(self, campaign_id: str, payload: PartySettingsUpdate) -> PartySettings:
+        with self.database.connect() as db:
+            db.execute("""INSERT INTO party_settings(campaign_id, name, level, size, notes)
+                          VALUES (?, ?, ?, ?, ?)
+                          ON CONFLICT(campaign_id) DO UPDATE SET name=excluded.name,
+                          level=excluded.level, size=excluded.size, notes=excluded.notes""",
+                       (campaign_id, payload.name, payload.level, payload.size, payload.notes))
+        return self.get_party_settings(campaign_id)
+
     def start_session(self, campaign_id: str) -> Session:
         session = Session(id=f"session_{uuid4().hex[:12]}", campaign_id=campaign_id)
         with self.database.connect() as db:
@@ -326,7 +410,8 @@ class SQLiteRepository:
         return CampaignBundle(
             campaign=campaign, locations=self.list_locations(campaign_id), factions=self.list_factions(campaign_id),
             npcs=self.list_npcs(campaign_id), events=self.list_events(campaign_id, 10000),
-            world_state=self.get_world_state(campaign_id), knowledge=simulation.list_campaign_knowledge(campaign_id),
+            world_state=self.get_world_state(campaign_id), party=self.get_party_settings(campaign_id),
+            knowledge=simulation.list_campaign_knowledge(campaign_id),
             rumors=simulation.list_rumors(campaign_id), generation_tables=simulation.list_tables(campaign_id),
             generation_entries=simulation.list_campaign_entries(campaign_id), encounters=simulation.list_encounters(campaign_id),
             rewards=simulation.list_rewards(campaign_id),
@@ -348,7 +433,13 @@ class SQLiteRepository:
                 raise ValueError(f"La facció de l'NPC {npc.name} no existeix")
         with self.database.connect() as db:
             c = package.campaign
-            db.execute("INSERT INTO campaigns VALUES (?, ?, ?, ?, ?, ?)", (c.id, c.name, c.system, c.rules_profile, c.current_day, c.current_location_id))
+            db.execute("""INSERT INTO campaigns(id, name, system, rules_profile, current_day, current_location_id, archived)
+                          VALUES (?, ?, ?, ?, ?, ?, ?)""", (c.id, c.name, c.system, c.rules_profile, c.current_day, c.current_location_id, int(c.archived)))
+            if package.party:
+                db.execute("INSERT INTO party_settings VALUES (?, ?, ?, ?, ?)",
+                           (c.id, package.party.name, package.party.level, package.party.size, package.party.notes))
+            else:
+                db.execute("INSERT INTO party_settings(campaign_id) VALUES (?)", (c.id,))
             for item in package.locations:
                 db.execute("INSERT INTO locations(id, campaign_id, name, description, terrain) VALUES (?, ?, ?, ?, ?)", (item.id, c.id, item.name, item.description, item.terrain))
             for item in package.factions:

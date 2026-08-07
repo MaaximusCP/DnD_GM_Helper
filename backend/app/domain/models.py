@@ -22,6 +22,7 @@ class Campaign(BaseModel):
     rules_profile: str = "campaign_default"
     current_day: int = 1
     current_location_id: str
+    archived: bool = False
 
 
 class CampaignCreate(BaseModel):
@@ -36,6 +37,7 @@ class CampaignUpdate(BaseModel):
     current_day: int | None = Field(default=None, ge=1, le=100000)
     current_location_id: str | None = None
     rules_profile: str | None = Field(default=None, max_length=80)
+    archived: bool | None = None
 
 
 class Location(BaseModel):
@@ -52,6 +54,12 @@ class LocationCreate(BaseModel):
     terrain: str = Field(default="urban", max_length=40)
 
 
+class LocationUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    terrain: str | None = Field(default=None, max_length=40)
+
+
 class Faction(BaseModel):
     id: str
     campaign_id: str
@@ -62,6 +70,30 @@ class Faction(BaseModel):
 class FactionCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     description: str = Field(default="", max_length=2000)
+
+
+class FactionUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class PartySettings(BaseModel):
+    campaign_id: str
+    name: str = "Grup d'aventurers"
+    level: int = Field(default=3, ge=1, le=20)
+    size: int = Field(default=4, ge=1, le=12)
+    notes: str = Field(default="", max_length=3000)
+
+
+class PartySettingsUpdate(BaseModel):
+    name: str = Field(default="Grup d'aventurers", min_length=2, max_length=120)
+    level: int = Field(default=3, ge=1, le=20)
+    size: int = Field(default=4, ge=1, le=12)
+    notes: str = Field(default="", max_length=3000)
+
+
+class WorldStateUpdate(BaseModel):
+    value: int | str
 
 
 class Memory(BaseModel):
@@ -297,6 +329,11 @@ class GenerationTableCreate(BaseModel):
     description: str = Field(default="", max_length=2000)
 
 
+class GenerationTableUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    description: str | None = Field(default=None, max_length=2000)
+
+
 class GenerationEntry(BaseModel):
     id: str
     table_id: str
@@ -381,6 +418,7 @@ class Reward(BaseModel):
 
 
 class CampaignBundle(CampaignImport):
+    party: PartySettings | None = None
     knowledge: list[Knowledge] = Field(default_factory=list)
     rumors: list[Rumor] = Field(default_factory=list)
     generation_tables: list[GenerationTable] = Field(default_factory=list)
