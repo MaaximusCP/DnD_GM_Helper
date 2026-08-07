@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.coverage
+htmlcov/
+
+# Node / Vite
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Local data and secrets
+.env
+data/*.db
+data/*.db-*
+data/*.pid
+backups/*
+!backups/.gitkeep
+library/**
+!library/.gitkeep
+!data/.gitkeep
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

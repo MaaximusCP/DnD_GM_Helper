@@ -1,0 +1,18 @@
+{
+  "id": "demo",
+  "name": "Expedició de la Jungla",
+  "system": "dnd5e",
+  "rules_profile": "campaign_default",
+  "modules": {
+    "memory": true,
+    "relationships": true,
+    "events": true,
+    "knowledge": true,
+    "library": true,
+    "rumors": true,
+    "encounters": true,
+    "rewards": true,
+    "custom_tables": true
+  },
+  "content_notice": "Campanya original de demostració; no conté material d'aventures publicades."
+}

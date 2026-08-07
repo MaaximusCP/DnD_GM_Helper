@@ -1,0 +1,56 @@
+# Arquitectura de la vertical slice
+
+## Principis
+
+1. SQLite conserva la veritat del món.
+2. El LLM interpreta un NPC, però no pot escriure directament a la base de dades.
+3. Qualsevol conseqüència sensible comença en estat `pending`.
+4. La campanya és contingut substituïble; el motor no codifica cap aventura publicada.
+5. La UI continua sent navegable si no hi ha un LLM actiu.
+6. Els documents originals no es confonen amb l'estat viu de la campanya.
+7. Encounters i recompenses es generen des de taules filtrades, no des de text lliure del LLM.
+
+## Flux d'un esdeveniment
+
+```text
+Text del DM
+   │
+   ▼
+EventService.analyze
+   │
+   ├── desa EventProposal(status=pending)
+   └── no modifica el món
+            │
+            ▼
+       Revisió del DM
+       │           │
+    aplicar      ignorar
+       │           │
+       ▼           ▼
+transacció SQL   conserva registre
+```
+
+L'analitzador 0.1 és deliberadament conservador i determinista. Reconeix patrons bàsics (ajuda, robatori, conflicte i suborn); la integració del GM Agent amb sortida estructurada pertany a la fase 0.3.
+
+## Flux d'una conversa
+
+`ContextBuilder` combina personalitat, objectius, relació, localització, estat del món i un màxim de cinc memòries. `LLMProvider` envia aquest context al proveïdor escollit. Els adapters d'Ollama i LM Studio queden a infraestructura; el domini no en depèn.
+
+## Persistència
+
+La inicialització és idempotent: crea les taules que falten i només insereix les dades demo quan no existeix cap campanya. Les operacions d'aplicació utilitzen una transacció SQLite i limiten les relacions a l'interval `[-100, 100]`.
+
+## Capes de coneixement
+
+```text
+Biblioteca immutable → fragments amb font i pàgina
+Dades canòniques     → NPC, llocs, faccions i taules aprovades
+Estat viu            → sessions, esdeveniments i reputació
+Coneixement NPC      → fets, creences i rumors amb confiança pròpia
+```
+
+Un rumor mai es converteix automàticament en una veritat del món. En propagar-lo es crea una entrada `belief` independent per a cada NPC que l'ha après.
+
+## Motors de generació
+
+`GenerationService` resol el terreny a partir del valor forçat pel DM o de la localització. Després filtra les entrades per campanya, tipus de taula, terreny, nivell i dificultat, i aplica el pes configurat. La selecció i els motius queden persistits per poder auditar el resultat.

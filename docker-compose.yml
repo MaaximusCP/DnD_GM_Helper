@@ -1,0 +1,15 @@
+services:
+  gm-ai:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      GM_AI_DATABASE_PATH: /workspace/data/campaign.db
+      GM_AI_LIBRARY_PATH: /workspace/library
+      GM_AI_LLM_PROVIDER: mock
+      GM_AI_CORS_ORIGINS: http://localhost:8000,http://127.0.0.1:8000
+    volumes:
+      - ./data:/workspace/data
+      - ./backups:/workspace/backups
+      - ./library:/workspace/library
+    restart: unless-stopped
