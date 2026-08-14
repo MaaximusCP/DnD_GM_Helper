@@ -87,11 +87,17 @@ class TravelService:
         weather = request.manual_weather or (weather_options[secrets.randbelow(len(weather_options))] if settings.track_weather else "ignored")
 
         notes = [f"Ruta de {len(travel_cells)} hexàgons a ritme {pace}", f"Durada estimada: {days} dia/dies"]
+        risk_level = destination.risk_level if settings.track_risk else 0
+        alert_level = destination.alert_level if settings.track_alert else 0
+        if settings.track_risk:
+            notes.append(f"Risc {risk_level}/5" + (f" ({', '.join(destination.risk_tags)})" if destination.risk_tags else ""))
+        if settings.track_alert:
+            notes.append(f"Alerta inicial {alert_level}/5")
         navigation_roll = None
         reached = True
         if settings.track_navigation:
             navigation_roll = request.navigation_roll or self._roll(20)
-            dc = 9 + destination.travel_cost + (2 if weather in {"heavy_rain", "storm", "mist"} else 0) + (2 if pace == "fast" else 0) - (2 if pace == "slow" else 0)
+            dc = 9 + destination.travel_cost + risk_level + (2 if weather in {"heavy_rain", "storm", "mist"} else 0) + (2 if pace == "fast" else 0) - (2 if pace == "slow" else 0)
             reached = navigation_roll >= dc
             notes.append(f"Navegació {navigation_roll} contra DC {dc}: {'èxit' if reached else 'el grup s’ha perdut'}")
 
@@ -127,13 +133,14 @@ class TravelService:
             encounter_roll = request.encounter_roll or self._roll(100)
             chance = max((all_cells[item].encounter_chance for item in travel_cells), default=destination.encounter_chance)
             chance += 10 if pace == "fast" else -5 if pace == "slow" else 0
+            chance += risk_level * 6 + alert_level * 5
             encounter_triggered = encounter_roll <= max(0, min(100, chance))
             notes.append(f"Encounter {encounter_roll} contra {chance}%: {'activat' if encounter_triggered else 'cap'}")
             if encounter_triggered:
                 encounter = GenerationService(self.simulation, self.world).generate_encounter(EncounterRequest(
                     campaign_id=campaign_id, location_id=destination.location_id, terrain=destination.terrain,
                     party_level=party.level, party_size=party.size,
-                    difficulty=max(1, min(5, destination.travel_cost)), encounter_type="auto",
+                    difficulty=max(1, min(5, destination.travel_cost + risk_level // 2 + alert_level // 2)), encounter_type="auto",
                 ))
                 encounter_id = encounter.id
 
@@ -145,6 +152,13 @@ class TravelService:
             food=new_food, water=new_water, exhaustion=new_exhaustion,
             lost=not reached if settings.track_navigation else False, weather=weather,
         ))
+        if settings.track_alert:
+            alert_delta = (1 if pace == "fast" else 0) + (1 if not reached else 0) + (1 if encounter_triggered else 0)
+            if settings.alert_decay and pace == "slow" and reached and not encounter_triggered:
+                alert_delta -= 1
+            new_alert = max(0, min(5, alert_level + alert_delta))
+            self.tools.update_hex(destination.id, HexCellUpdate(alert_level=new_alert))
+            notes.append(f"Alerta {'+' if alert_delta > 0 else ''}{alert_delta}: nivell final {new_alert}/5")
         if reached and settings.auto_discover:
             for item_id in route:
                 cell = all_cells[item_id]

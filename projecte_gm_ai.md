@@ -1954,17 +1954,17 @@ Objectiu: validar l'experiència real del DM des del primer moment.
 - launcher, dashboard refinat, backups i gestió de configuració;
 - importació/exportació robusta de tot el Party Core.
 
-## Versió 0.9 — Azure opcional
+## Versió 0.9 — Campaign Operations
 
-Només si aporta valor real després de validar l'ús local:
-
-- compte/sessió d'usuari si és necessari;
-- sincronització opcional;
-- Cosmos DB com a backend remot;
-- Azure Functions per processos puntuals;
-- possible frontend remot amb Static Web Apps;
-- backup cloud;
-- resolució de conflictes offline/online.
+- missions i objectius amb visibilitat diferenciada;
+- calendari, venciments i cronologia;
+- clocks, amenaces i conseqüències;
+- Session Planner, registre automàtic i resum validable;
+- resolució d'encounters connectada a XP, botí, missions i clocks;
+- progressió de personatges i descansos ampliats;
+- mapes d'imatge amb marcadors i vincles documentals;
+- hexcrawl amb risc, etiquetes de perill i alerta dinàmica;
+- projecció filtrada de missions, calendari i cronologia als jugadors.
 
 ## Versió 1.0 — Motor de campanyes
 

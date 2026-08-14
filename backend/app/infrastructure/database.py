@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS hex_cells (
     terrain TEXT NOT NULL, title TEXT NOT NULL, discovery TEXT NOT NULL,
     travel_cost INTEGER NOT NULL, encounter_chance INTEGER NOT NULL,
     player_notes TEXT NOT NULL, dm_notes TEXT NOT NULL, location_id TEXT, source_id TEXT,
+    risk_level INTEGER NOT NULL DEFAULT 1, alert_level INTEGER NOT NULL DEFAULT 0, risk_tags TEXT NOT NULL DEFAULT '[]',
     UNIQUE(campaign_id, q, r), FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 CREATE TABLE IF NOT EXISTS combats (
@@ -151,6 +152,7 @@ CREATE TABLE IF NOT EXISTS hexcrawl_settings (
     track_encounters INTEGER NOT NULL DEFAULT 1, track_foraging INTEGER NOT NULL DEFAULT 1,
     auto_discover INTEGER NOT NULL DEFAULT 1, default_pace TEXT NOT NULL DEFAULT 'normal',
     hex_distance REAL NOT NULL DEFAULT 10, distance_unit TEXT NOT NULL DEFAULT 'km',
+    track_risk INTEGER NOT NULL DEFAULT 1, track_alert INTEGER NOT NULL DEFAULT 1, alert_decay INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 CREATE TABLE IF NOT EXISTS expedition_state (
@@ -188,6 +190,9 @@ CREATE TABLE IF NOT EXISTS characters (
     exhaustion INTEGER NOT NULL DEFAULT 0, conditions TEXT NOT NULL DEFAULT '[]', spell_slots TEXT NOT NULL DEFAULT '{}',
     spell_slots_max TEXT NOT NULL DEFAULT '{}', resources TEXT NOT NULL DEFAULT '[]', notes TEXT NOT NULL DEFAULT '',
     share_with_players INTEGER NOT NULL DEFAULT 1, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
+    xp INTEGER NOT NULL DEFAULT 0, milestone INTEGER NOT NULL DEFAULT 0, inspiration INTEGER NOT NULL DEFAULT 0,
+    hit_dice_current INTEGER NOT NULL DEFAULT 1, hit_dice_max INTEGER NOT NULL DEFAULT 1,
+    death_saves_success INTEGER NOT NULL DEFAULT 0, death_saves_failure INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 CREATE TABLE IF NOT EXISTS treasury (
@@ -208,6 +213,17 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
     item_id TEXT, character_id TEXT, currency TEXT, currency_delta REAL NOT NULL DEFAULT 0,
     quantity_delta REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
     FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS campaign_records (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active', visibility TEXT NOT NULL DEFAULT 'dm', due_day INTEGER,
+    linked_id TEXT, data TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS campaign_activities (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, session_id TEXT, kind TEXT NOT NULL,
+    title TEXT NOT NULL, details TEXT NOT NULL DEFAULT '', visibility TEXT NOT NULL DEFAULT 'dm',
+    linked_id TEXT, created_at TEXT NOT NULL, FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 """
 
@@ -266,6 +282,24 @@ class Database:
                 connection.execute("ALTER TABLE travel_logs ADD COLUMN encounter_id TEXT")
             if "distance_unit" not in travel_columns:
                 connection.execute("ALTER TABLE travel_logs ADD COLUMN distance_unit TEXT NOT NULL DEFAULT 'km'")
+            hex_columns = {row["name"] for row in connection.execute("PRAGMA table_info(hex_cells)")}
+            for name, definition in {"risk_level":"INTEGER NOT NULL DEFAULT 1", "alert_level":"INTEGER NOT NULL DEFAULT 0", "risk_tags":"TEXT NOT NULL DEFAULT '[]'"}.items():
+                if name not in hex_columns:
+                    connection.execute(f"ALTER TABLE hex_cells ADD COLUMN {name} {definition}")
+            crawl_columns = {row["name"] for row in connection.execute("PRAGMA table_info(hexcrawl_settings)")}
+            for name in ("track_risk", "track_alert", "alert_decay"):
+                if name not in crawl_columns:
+                    connection.execute(f"ALTER TABLE hexcrawl_settings ADD COLUMN {name} INTEGER NOT NULL DEFAULT 1")
+            character_columns = {row["name"] for row in connection.execute("PRAGMA table_info(characters)")}
+            character_migrations = {
+                "xp":"INTEGER NOT NULL DEFAULT 0", "milestone":"INTEGER NOT NULL DEFAULT 0",
+                "inspiration":"INTEGER NOT NULL DEFAULT 0", "hit_dice_current":"INTEGER NOT NULL DEFAULT 1",
+                "hit_dice_max":"INTEGER NOT NULL DEFAULT 1", "death_saves_success":"INTEGER NOT NULL DEFAULT 0",
+                "death_saves_failure":"INTEGER NOT NULL DEFAULT 0",
+            }
+            for name, definition in character_migrations.items():
+                if name not in character_columns:
+                    connection.execute(f"ALTER TABLE characters ADD COLUMN {name} {definition}")
             connection.execute("""CREATE TABLE IF NOT EXISTS party_settings (
                 campaign_id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT 'Grup d''aventurers',
                 level INTEGER NOT NULL DEFAULT 3, size INTEGER NOT NULL DEFAULT 4,
@@ -281,6 +315,7 @@ class Database:
             self._seed_generation(connection)
             self._seed_campaign_tools(connection)
             self._seed_party(connection)
+            self._seed_operations(connection)
 
     def _seed_party(self, db: sqlite3.Connection) -> None:
         if not db.execute("SELECT 1 FROM campaigns WHERE id='demo'").fetchone():
@@ -303,6 +338,30 @@ class Database:
         db.execute("""INSERT OR IGNORE INTO inventory_items(id,campaign_id,owner_type,name,category,quantity,weight,value,
             currency_unit,description,consumable,created_at) VALUES ('item_rations','demo','party','Racions','supplies',8,2,0.5,'gp',
             'Menjar per a una jornada',1,datetime('now'))""")
+
+    def _seed_operations(self, db: sqlite3.Connection) -> None:
+        if not db.execute("SELECT 1 FROM campaigns WHERE id='demo'").fetchone() or db.execute("SELECT 1 FROM campaign_records WHERE campaign_id='demo' LIMIT 1").fetchone():
+            return
+        now = "2026-01-01T00:00:00+00:00"
+        records = [
+            ("quest_lost_temple", "quest", "Localitzar el temple perdut", "active", "players", 8, None,
+             {"description":"Seguir les pistes del mapa i trobar una entrada segura.","objectives":["Parlar amb el guia","Explorar les ruïnes"],"reward":"Accés al temple"}),
+            ("calendar_supply_ship", "calendar", "Arribada del vaixell de provisions", "active", "players", 5, None,
+             {"description":"El vaixell només romandrà un dia al port."}),
+            ("clock_yuanti", "clock", "Els yuan-ti detecten l'expedició", "active", "dm", None, None,
+             {"description":"Patrulles i espies segueixen el grup.","current":1,"maximum":4,"consequence":"Una partida de caça prepara una emboscada."}),
+            ("scene_ruins", "scene", "Veus entre les ruïnes", "planned", "dm", None, "hex_demo_1_0",
+             {"notes":"Presentar una pista, una tria de ruta i un signe de perill."}),
+            ("map_chult_demo", "map", "Mapa de l'expedició", "active", "dm", None, None,
+             {"source_id":""}),
+            ("marker_port_demo", "marker", "Port Verd", "active", "players", None, "map_chult_demo",
+             {"x":24,"y":68,"notes":"Punt de partida de l'expedició"}),
+        ]
+        for item_id, kind, title, status, visibility, due_day, linked_id, data in records:
+            db.execute("INSERT INTO campaign_records VALUES (?,?,?,?,?,?,?,?,?,?,?)", (item_id, "demo", kind, title,
+                status, visibility, due_day, linked_id, json.dumps(data), now, now))
+        db.execute("UPDATE hex_cells SET risk_level=3,alert_level=1,risk_tags=? WHERE id='hex_demo_1_0'", (json.dumps(["patrulles", "ruïnes inestables"]),))
+        db.execute("UPDATE hex_cells SET risk_level=4,alert_level=0,risk_tags=? WHERE id='hex_demo_0_1'", (json.dumps(["malaltia", "depredadors"]),))
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
@@ -394,7 +453,8 @@ class Database:
                 ("hex_demo_-1_1", -1, 1, "swamp", "Aiguamolls silenciosos", "hidden", 3, 35, "", "Boira densa i terreny difícil; possible refugi d'una criatura territorial.", None),
             ]
             for row in hexes:
-                db.execute("INSERT INTO hex_cells VALUES (?, 'demo', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)", row)
+                db.execute("""INSERT INTO hex_cells(id,campaign_id,q,r,terrain,title,discovery,travel_cost,encounter_chance,
+                           player_notes,dm_notes,location_id,source_id) VALUES (?, 'demo', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)""", row)
         if not db.execute("SELECT 1 FROM combats WHERE campaign_id='demo' LIMIT 1").fetchone():
             db.execute("""INSERT INTO combats(id,campaign_id,name,status,round,turn_index,encounter_id,summary,created_at)
                           VALUES ('combat_demo', 'demo', 'Emboscada al sender', 'active', 1, 0, NULL, '', datetime('now'))""")

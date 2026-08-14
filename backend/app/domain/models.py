@@ -141,6 +141,9 @@ class HexCell(BaseModel):
     dm_notes: str = ""
     location_id: str | None = None
     source_id: str | None = None
+    risk_level: int = Field(default=1, ge=0, le=5)
+    alert_level: int = Field(default=0, ge=0, le=5)
+    risk_tags: list[str] = Field(default_factory=list)
 
 
 class HexCellCreate(BaseModel):
@@ -156,6 +159,9 @@ class HexCellCreate(BaseModel):
     dm_notes: str = Field(default="", max_length=5000)
     location_id: str | None = None
     source_id: str | None = None
+    risk_level: int = Field(default=1, ge=0, le=5)
+    alert_level: int = Field(default=0, ge=0, le=5)
+    risk_tags: list[str] = Field(default_factory=list, max_length=20)
 
 
 class HexCellUpdate(BaseModel):
@@ -168,6 +174,9 @@ class HexCellUpdate(BaseModel):
     dm_notes: str | None = Field(default=None, max_length=5000)
     location_id: str | None = None
     source_id: str | None = None
+    risk_level: int | None = Field(default=None, ge=0, le=5)
+    alert_level: int | None = Field(default=None, ge=0, le=5)
+    risk_tags: list[str] | None = Field(default=None, max_length=20)
 
 
 class HexRevealRequest(BaseModel):
@@ -189,6 +198,9 @@ class HexcrawlSettings(BaseModel):
     default_pace: Literal["slow", "normal", "fast"] = "normal"
     hex_distance: float = Field(default=10, gt=0, le=1000)
     distance_unit: Literal["km", "miles"] = "km"
+    track_risk: bool = True
+    track_alert: bool = True
+    alert_decay: bool = True
 
 
 class HexcrawlSettingsUpdate(BaseModel):
@@ -203,6 +215,9 @@ class HexcrawlSettingsUpdate(BaseModel):
     default_pace: Literal["slow", "normal", "fast"] | None = None
     hex_distance: float | None = Field(default=None, gt=0, le=1000)
     distance_unit: Literal["km", "miles"] | None = None
+    track_risk: bool | None = None
+    track_alert: bool | None = None
+    alert_decay: bool | None = None
 
 
 class ExpeditionState(BaseModel):
@@ -335,6 +350,13 @@ class Character(BaseModel):
     share_with_players: bool = True
     active: bool = True
     created_at: str = Field(default_factory=utc_now)
+    xp: int = Field(default=0, ge=0)
+    milestone: int = Field(default=0, ge=0, le=20)
+    inspiration: bool = False
+    hit_dice_current: int = Field(default=1, ge=0, le=20)
+    hit_dice_max: int = Field(default=1, ge=1, le=20)
+    death_saves_success: int = Field(default=0, ge=0, le=3)
+    death_saves_failure: int = Field(default=0, ge=0, le=3)
 
 
 class CharacterCreate(BaseModel):
@@ -361,6 +383,11 @@ class CharacterCreate(BaseModel):
     notes: str = Field(default="", max_length=5000)
     share_with_players: bool = True
     active: bool = True
+    xp: int = Field(default=0, ge=0)
+    milestone: int = Field(default=0, ge=0, le=20)
+    inspiration: bool = False
+    hit_dice_current: int | None = Field(default=None, ge=0, le=20)
+    hit_dice_max: int | None = Field(default=None, ge=1, le=20)
 
 
 class CharacterUpdate(BaseModel):
@@ -386,6 +413,85 @@ class CharacterUpdate(BaseModel):
     notes: str | None = Field(default=None, max_length=5000)
     share_with_players: bool | None = None
     active: bool | None = None
+    xp: int | None = Field(default=None, ge=0)
+    milestone: int | None = Field(default=None, ge=0, le=20)
+    inspiration: bool | None = None
+    hit_dice_current: int | None = Field(default=None, ge=0, le=20)
+    hit_dice_max: int | None = Field(default=None, ge=1, le=20)
+    death_saves_success: int | None = Field(default=None, ge=0, le=3)
+    death_saves_failure: int | None = Field(default=None, ge=0, le=3)
+
+
+class CampaignRecord(BaseModel):
+    id: str
+    campaign_id: str
+    kind: Literal["quest", "calendar", "clock", "scene", "map", "marker", "library_link"]
+    title: str
+    status: str = "active"
+    visibility: Literal["dm", "players", "world"] = "dm"
+    due_day: int | None = None
+    linked_id: str | None = None
+    data: dict = Field(default_factory=dict)
+    created_at: str = Field(default_factory=utc_now)
+    updated_at: str = Field(default_factory=utc_now)
+
+
+class CampaignRecordCreate(BaseModel):
+    campaign_id: str = "demo"
+    kind: Literal["quest", "calendar", "clock", "scene", "map", "marker", "library_link"]
+    title: str = Field(min_length=2, max_length=200)
+    status: str = Field(default="active", max_length=40)
+    visibility: Literal["dm", "players", "world"] = "dm"
+    due_day: int | None = Field(default=None, ge=1)
+    linked_id: str | None = None
+    data: dict = Field(default_factory=dict)
+
+
+class CampaignRecordUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    status: str | None = Field(default=None, max_length=40)
+    visibility: Literal["dm", "players", "world"] | None = None
+    due_day: int | None = Field(default=None, ge=1)
+    linked_id: str | None = None
+    data: dict | None = None
+
+
+class CampaignActivity(BaseModel):
+    id: str
+    campaign_id: str
+    session_id: str | None = None
+    kind: str
+    title: str
+    details: str = ""
+    visibility: Literal["dm", "players"] = "dm"
+    linked_id: str | None = None
+    created_at: str = Field(default_factory=utc_now)
+
+
+class CampaignActivityCreate(BaseModel):
+    campaign_id: str = "demo"
+    session_id: str | None = None
+    kind: str = Field(default="note", max_length=80)
+    title: str = Field(min_length=2, max_length=200)
+    details: str = Field(default="", max_length=10000)
+    visibility: Literal["dm", "players"] = "dm"
+    linked_id: str | None = None
+
+
+class EncounterResolution(BaseModel):
+    outcome: Literal["victory", "defeat", "retreat", "negotiated", "partial"]
+    summary: str = Field(default="", max_length=5000)
+    xp: int = Field(default=0, ge=0, le=1000000)
+    advance_clock_id: str | None = None
+    clock_steps: int = Field(default=0, ge=0, le=20)
+    quest_id: str | None = None
+    quest_status: str | None = None
+    generate_reward: bool = False
+
+
+class SessionCloseRequest(BaseModel):
+    summary: str = Field(default="", max_length=10000)
+    share_summary: bool = True
 
 
 class Treasury(BaseModel):
@@ -737,7 +843,7 @@ class SessionEndRequest(BaseModel):
 
 
 class SearchResult(BaseModel):
-    kind: Literal["npc", "event", "location", "faction", "memory"]
+    kind: Literal["npc", "event", "location", "faction", "memory", "record", "activity"]
     id: str
     title: str
     excerpt: str = ""
@@ -960,4 +1066,6 @@ class CampaignBundle(CampaignImport):
     inventory: list[InventoryItem] = Field(default_factory=list)
     treasury: Treasury | None = None
     inventory_transactions: list[InventoryTransaction] = Field(default_factory=list)
+    campaign_records: list[CampaignRecord] = Field(default_factory=list)
+    campaign_activities: list[CampaignActivity] = Field(default_factory=list)
     excluded_content_notice: str = "Els fitxers de la biblioteca documental no s'inclouen en l'exportació."

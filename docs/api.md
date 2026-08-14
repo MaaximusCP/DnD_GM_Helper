@@ -84,6 +84,12 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `POST` | `/campaigns/{id}/treasury/adjust` | Registra un ingrés o una despesa auditada |
 | `GET` | `/campaigns/{id}/inventory-transactions` | Historial d'inventari i tresoreria |
 | `POST` | `/combats/{id}/characters` | Afegeix personatges al combat amb PG i condicions sincronitzats |
+| `GET/POST` | `/campaign-records` | Llista o crea missions, calendari, clocks, escenes, mapes, marcadors i vincles |
+| `PATCH/DELETE` | `/campaign-records/{id}` | Actualitza estat, visibilitat i dades d'un element d'operacions |
+| `GET/POST` | `/campaigns/{id}/activities` | Cronologia automàtica i notes de sessió |
+| `POST` | `/sessions/{id}/close` | Tanca la sessió i genera un resum a partir de l'activitat |
+| `POST` | `/encounters/{id}/resolve` | Resol l'encounter i aplica XP, missió, clock i recompensa |
+| `GET` | `/library/{id}/asset` | Serveix localment una imatge o document de la biblioteca |
 | `GET` | `/reference/meta` | Versió, llicència i recompte del catàleg SRD local |
 | `GET` | `/reference?category=...&q=...` | Cerca paginada al catàleg SRD |
 | `GET` | `/reference/item/{id}` | Fitxa estructurada completa d'una entrada SRD |

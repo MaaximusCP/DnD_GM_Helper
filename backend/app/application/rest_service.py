@@ -64,6 +64,12 @@ class RestService:
         ))
         if day_advanced:
             self.world.update_campaign(campaign_id, CampaignUpdate(current_day=campaign.current_day + day_advanced))
+        if is_long and request.safe_camp and settings.track_alert and settings.alert_decay:
+            current_hex = self.tools.get_hex(state.current_hex_id)
+            if current_hex and current_hex.alert_level > 0:
+                from app.domain.models import HexCellUpdate
+                self.tools.update_hex(current_hex.id, HexCellUpdate(alert_level=current_hex.alert_level - 1))
+                notes.append(f"L'alerta de la zona baixa a {current_hex.alert_level - 1}/5")
         characters_recovered = PartyRepository(self.tools.database).apply_rest(
             campaign_id, request.rest_type, request.safe_camp and not shortage,
         )

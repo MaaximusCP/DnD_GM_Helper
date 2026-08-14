@@ -5,6 +5,7 @@ import type {
   Combat, Combatant, CombatLog, ExpeditionState, HexCell, HexcrawlSettings, LoreEntry, LoreLayer,
   ExpeditionRestResult, PlayerView, PlayerViewSettings, TravelLog,
   Character, InventoryItem, Treasury, InventoryTransaction,
+  CampaignRecord, CampaignActivity,
 } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000/api' : '/api')
@@ -109,4 +110,11 @@ export const api = {
   adjustTreasury: (campaignId:string,currency:string,amount:number,description:string) => request<Treasury>(`/campaigns/${campaignId}/treasury/adjust`,{method:'POST',body:JSON.stringify({currency,amount,description})}),
   inventoryTransactions: (campaignId:string) => request<InventoryTransaction[]>(`/campaigns/${campaignId}/inventory-transactions`),
   addCharactersToCombat: (combatId:string,characterIds:string[]=[]) => request<Combat>(`/combats/${combatId}/characters`,{method:'POST',body:JSON.stringify({character_ids:characterIds,roll_initiative:true})}),
+  records: (campaignId:string,kind?:string) => request<CampaignRecord[]>(`/campaign-records?campaign_id=${campaignId}${kind?`&kind=${kind}`:''}`),
+  createRecord: (campaignId:string,payload:Record<string,unknown>) => request<CampaignRecord>('/campaign-records',{method:'POST',body:JSON.stringify({campaign_id:campaignId,...payload})}),
+  updateRecord: (id:string,payload:Partial<CampaignRecord>) => request<CampaignRecord>(`/campaign-records/${id}`,{method:'PATCH',body:JSON.stringify(payload)}),
+  deleteRecord: (id:string) => request<void>(`/campaign-records/${id}?confirm=true`,{method:'DELETE'}),
+  addActivity: (campaignId:string,payload:Record<string,unknown>) => request<CampaignActivity>(`/campaigns/${campaignId}/activities`,{method:'POST',body:JSON.stringify({campaign_id:campaignId,...payload})}),
+  closeSession: (id:string,summary='',shareSummary=true) => request<{session:Session;summary:string;activities:CampaignActivity[]}>(`/sessions/${id}/close`,{method:'POST',body:JSON.stringify({summary,share_summary:shareSummary})}),
+  resolveEncounter: (id:string,payload:Record<string,unknown>) => request<Record<string,unknown>>(`/encounters/${id}/resolve`,{method:'POST',body:JSON.stringify(payload)}),
 }

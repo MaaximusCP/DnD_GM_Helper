@@ -3,6 +3,7 @@ import re
 import secrets
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi.responses import FileResponse
 
 from app.application.context_builder import ContextBuilder
 from app.application.event_service import EventService
@@ -30,6 +31,8 @@ from app.domain.models import (
     CharacterCreate, CharacterUpdate, CharacterCombatRequest,
     InventoryItemCreate, InventoryItemUpdate, InventoryConsume,
     TreasuryUpdate, TreasuryAdjustment, RewardClaimRequest,
+    CampaignRecordCreate, CampaignRecordUpdate, CampaignActivityCreate,
+    EncounterResolution, SessionCloseRequest,
 )
 from app.infrastructure.campaign_tools_repository import CampaignToolsRepository
 from app.infrastructure.content_repository import ContentRepository
@@ -39,6 +42,7 @@ from app.infrastructure.repository import SQLiteRepository
 from app.infrastructure.reference_catalog import ReferenceCatalog
 from app.infrastructure.simulation_repository import SimulationRepository
 from app.infrastructure.party_repository import PartyRepository
+from app.infrastructure.operations_repository import OperationsRepository
 
 
 router = APIRouter()
@@ -62,6 +66,10 @@ def get_campaign_tools_repository(settings: Settings = Depends(get_settings)) ->
 
 def get_party_repository(settings: Settings = Depends(get_settings)) -> PartyRepository:
     return PartyRepository(Database(settings.database_path))
+
+
+def get_operations_repository(settings: Settings = Depends(get_settings)) -> OperationsRepository:
+    return OperationsRepository(Database(settings.database_path))
 
 
 def _add_reference_combatants(repository: CampaignToolsRepository, combat_id: str,
@@ -98,7 +106,7 @@ def create_campaign(payload: CampaignCreate, repository: SQLiteRepository = Depe
 
 
 @router.get("/campaigns/{campaign_id}")
-def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_repository), tools: CampaignToolsRepository = Depends(get_campaign_tools_repository), party_repo: PartyRepository = Depends(get_party_repository)):
+def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_repository), tools: CampaignToolsRepository = Depends(get_campaign_tools_repository), party_repo: PartyRepository = Depends(get_party_repository), operations: OperationsRepository = Depends(get_operations_repository)):
     campaign = repository.get_campaign(campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campanya no trobada")
@@ -126,6 +134,8 @@ def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_r
         "inventory": party_repo.list_inventory(campaign_id),
         "treasury": party_repo.get_treasury(campaign_id),
         "inventory_transactions": party_repo.list_transactions(campaign_id),
+        "campaign_records": operations.list_records(campaign_id),
+        "campaign_activities": operations.list_activities(campaign_id),
         "travel_logs": tools.list_travel_logs(campaign_id),
         "player_view_settings": tools.get_player_view_settings(campaign_id),
     }
@@ -247,12 +257,61 @@ def import_campaign(payload: CampaignBundle, repository: SQLiteRepository = Depe
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.get("/campaign-records")
+def list_campaign_records(campaign_id: str = "demo", kind: str | None = None,
+                          repository: OperationsRepository = Depends(get_operations_repository)):
+    return repository.list_records(campaign_id, kind)
+
+
+@router.post("/campaign-records", status_code=status.HTTP_201_CREATED)
+def create_campaign_record(payload: CampaignRecordCreate,
+                           world: SQLiteRepository = Depends(get_repository),
+                           repository: OperationsRepository = Depends(get_operations_repository)):
+    if not world.get_campaign(payload.campaign_id):
+        raise HTTPException(status_code=404, detail="Campanya no trobada")
+    return repository.create_record(payload)
+
+
+@router.patch("/campaign-records/{item_id}")
+def update_campaign_record(item_id: str, payload: CampaignRecordUpdate,
+                           repository: OperationsRepository = Depends(get_operations_repository)):
+    item = repository.update_record(item_id, payload)
+    if not item:
+        raise HTTPException(status_code=404, detail="Element no trobat")
+    return item
+
+
+@router.delete("/campaign-records/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_campaign_record(item_id: str, confirm: bool = False,
+                           repository: OperationsRepository = Depends(get_operations_repository)):
+    if not confirm:
+        raise HTTPException(status_code=409, detail="Cal confirm=true")
+    if not repository.delete_record(item_id):
+        raise HTTPException(status_code=404, detail="Element no trobat")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/campaigns/{campaign_id}/activities")
+def list_campaign_activities(campaign_id: str, repository: OperationsRepository = Depends(get_operations_repository)):
+    return repository.list_activities(campaign_id)
+
+
+@router.post("/campaigns/{campaign_id}/activities", status_code=status.HTTP_201_CREATED)
+def add_campaign_activity(campaign_id: str, payload: CampaignActivityCreate,
+                          repository: OperationsRepository = Depends(get_operations_repository)):
+    return repository.add_activity(payload.model_copy(update={"campaign_id": campaign_id,
+        "session_id": payload.session_id or repository.active_session_id(campaign_id)}))
+
+
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
-def start_session(campaign_id: str = "demo", repository: SQLiteRepository = Depends(get_repository)):
+def start_session(campaign_id: str = "demo", repository: SQLiteRepository = Depends(get_repository), operations: OperationsRepository = Depends(get_operations_repository)):
     if not repository.get_campaign(campaign_id):
         raise HTTPException(status_code=404, detail="Campanya no trobada")
     try:
-        return repository.start_session(campaign_id)
+        session = repository.start_session(campaign_id)
+        operations.add_activity(CampaignActivityCreate(campaign_id=campaign_id, session_id=session.id,
+            kind="session", title="Sessió iniciada"))
+        return session
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -268,6 +327,25 @@ def end_session(session_id: str, payload: SessionEndRequest, repository: SQLiteR
     if not session:
         raise HTTPException(status_code=404, detail="Sessió no trobada")
     return session
+
+
+@router.post("/sessions/{session_id}/close")
+def close_session(session_id: str, payload: SessionCloseRequest,
+                  repository: SQLiteRepository = Depends(get_repository),
+                  operations: OperationsRepository = Depends(get_operations_repository)):
+    current = repository.get_session(session_id)
+    if not current:
+        raise HTTPException(status_code=404, detail="Sessió no trobada")
+    activities = [item for item in operations.list_activities(current.campaign_id, 500) if item.session_id == session_id]
+    summary = payload.summary.strip()
+    if not summary:
+        lines = [f"- {item.title}{': ' + item.details if item.details else ''}" for item in reversed(activities)]
+        summary = "Resum automàtic de la sessió\n" + ("\n".join(lines) if lines else "- Sense activitat registrada")
+    session = repository.end_session(session_id, summary)
+    operations.add_activity(CampaignActivityCreate(campaign_id=current.campaign_id, session_id=session_id,
+        kind="session", title="Sessió tancada", details=summary,
+        visibility="players" if payload.share_summary else "dm"))
+    return {"session": session, "summary": summary, "activities": activities}
 
 
 @router.get("/npcs")
@@ -470,6 +548,17 @@ def list_library(campaign_id: str = "demo", repository: ContentRepository = Depe
     return repository.list_sources(campaign_id)
 
 
+@router.get("/library/{source_id}/asset", response_model=None)
+def library_asset(source_id: str, repository: ContentRepository = Depends(get_content_repository)):
+    source = repository.get_source(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Font no trobada")
+    path = Path(source.file_path).resolve()
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Fitxer no disponible")
+    return FileResponse(path, media_type=source.mime_type, filename=source.file_name)
+
+
 @router.get("/library/search")
 def search_library(q: str, campaign_id: str = "demo", repository: ContentRepository = Depends(get_content_repository)):
     if len(q.strip()) < 2:
@@ -637,9 +726,13 @@ def update_expedition(campaign_id: str, payload: ExpeditionStateUpdate, reposito
 
 
 @router.post("/campaigns/{campaign_id}/travel", status_code=status.HTTP_201_CREATED)
-def travel(campaign_id: str, payload: TravelRequest, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), world: SQLiteRepository = Depends(get_repository), simulation: SimulationRepository = Depends(get_simulation_repository)):
+def travel(campaign_id: str, payload: TravelRequest, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), world: SQLiteRepository = Depends(get_repository), simulation: SimulationRepository = Depends(get_simulation_repository), operations: OperationsRepository = Depends(get_operations_repository)):
     try:
-        return TravelService(repository, world, simulation).travel(campaign_id, payload)
+        result = TravelService(repository, world, simulation).travel(campaign_id, payload)
+        operations.add_activity(CampaignActivityCreate(campaign_id=campaign_id, session_id=operations.active_session_id(campaign_id),
+            kind="travel", title=f"Viatge: {result.distance:g} {result.distance_unit}", details="; ".join(result.notes),
+            linked_id=result.id, visibility="players"))
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -647,9 +740,14 @@ def travel(campaign_id: str, payload: TravelRequest, repository: CampaignToolsRe
 @router.post("/campaigns/{campaign_id}/rest", status_code=status.HTTP_201_CREATED)
 def rest(campaign_id: str, payload: ExpeditionRestRequest,
          repository: CampaignToolsRepository = Depends(get_campaign_tools_repository),
-         world: SQLiteRepository = Depends(get_repository)):
+         world: SQLiteRepository = Depends(get_repository),
+         operations: OperationsRepository = Depends(get_operations_repository)):
     try:
-        return RestService(repository, world).rest(campaign_id, payload)
+        result = RestService(repository, world).rest(campaign_id, payload)
+        operations.add_activity(CampaignActivityCreate(campaign_id=campaign_id, session_id=operations.active_session_id(campaign_id),
+            kind="rest", title="Descans llarg" if payload.rest_type == "long" else "Descans curt",
+            details="; ".join(result.notes), visibility="players"))
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -665,7 +763,7 @@ def update_player_view_settings(campaign_id: str, payload: PlayerViewSettingsUpd
 
 
 @router.get("/player-view/{campaign_id}")
-def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_repository), repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), simulation: SimulationRepository = Depends(get_simulation_repository), party_repo: PartyRepository = Depends(get_party_repository)):
+def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_repository), repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), simulation: SimulationRepository = Depends(get_simulation_repository), party_repo: PartyRepository = Depends(get_party_repository), operations: OperationsRepository = Depends(get_operations_repository)):
     campaign = world.get_campaign(campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campanya no trobada")
@@ -698,6 +796,8 @@ def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_reposito
                     "max_hp": item.max_hp if visible_hp else None,
                 })
             combats.append({"id": combat.id, "name": combat.name, "round": combat.round, "turn_index": combat.turn_index, "combatants": combatants})
+    public_markers = [item for item in operations.list_records(campaign_id, "marker") if item.visibility == "players"]
+    public_map_ids = {item.linked_id for item in public_markers if item.linked_id}
     return {
         "campaign": {"id": campaign.id, "name": campaign.name, "current_day": campaign.current_day},
         "party": {"name": world.get_party_settings(campaign_id).name},
@@ -712,6 +812,12 @@ def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_reposito
         "inventory": [item.model_dump() for item in party_repo.list_inventory(campaign_id, "party")]
                      if settings.show_inventory else [],
         "treasury": party_repo.get_treasury(campaign_id).model_dump() if settings.show_inventory else None,
+        "quests": [item.model_dump() for item in operations.list_records(campaign_id, "quest") if item.visibility == "players"],
+        "calendar": [item.model_dump() for item in operations.list_records(campaign_id, "calendar") if item.visibility == "players"],
+        "markers": [item.model_dump() for item in public_markers],
+        "maps": [item.model_dump() for item in operations.list_records(campaign_id, "map")
+                 if item.visibility == "players" or item.id in public_map_ids],
+        "timeline": [item.model_dump() for item in operations.list_activities(campaign_id, 50) if item.visibility == "players"],
         "combats": combats, "settings": settings,
     }
 
@@ -771,9 +877,15 @@ def update_inventory(item_id: str, payload: InventoryItemUpdate, repository: Par
 
 
 @router.post("/inventory/{item_id}/consume")
-def consume_inventory(item_id: str, payload: InventoryConsume, repository: PartyRepository = Depends(get_party_repository)):
+def consume_inventory(item_id: str, payload: InventoryConsume, repository: PartyRepository = Depends(get_party_repository), operations: OperationsRepository = Depends(get_operations_repository)):
     try:
-        return {"item": repository.consume_inventory_item(item_id, payload)}
+        before = repository.get_inventory_item(item_id)
+        item = repository.consume_inventory_item(item_id, payload)
+        if before:
+            operations.add_activity(CampaignActivityCreate(campaign_id=before.campaign_id,
+                session_id=operations.active_session_id(before.campaign_id), kind="inventory",
+                title=f"Consumit: {before.name}", details=f"Quantitat: {payload.quantity}"))
+        return {"item": item}
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -825,12 +937,18 @@ def create_combat(payload: CombatCreate, world: SQLiteRepository = Depends(get_r
 @router.patch("/combats/{combat_id}")
 def update_combat(combat_id: str, payload: CombatUpdate,
                   repository: CampaignToolsRepository = Depends(get_campaign_tools_repository),
-                  simulation: SimulationRepository = Depends(get_simulation_repository)):
+                  simulation: SimulationRepository = Depends(get_simulation_repository),
+                  operations: OperationsRepository = Depends(get_operations_repository)):
     item = repository.update_combat(combat_id, payload)
     if not item:
         raise HTTPException(status_code=404, detail="Combat no trobat")
     if item.encounter_id and payload.status:
         simulation.update_encounter_status(item.encounter_id, "resolved" if payload.status == "completed" else "generated")
+    if payload.status == "completed":
+        operations.add_activity(CampaignActivityCreate(campaign_id=item.campaign_id,
+            session_id=operations.active_session_id(item.campaign_id), kind="combat",
+            title=f"Combat finalitzat: {item.name}", details=item.summary, linked_id=item.id,
+            visibility="players"))
     return item
 
 
@@ -1061,6 +1179,38 @@ def list_rewards(campaign_id: str = "demo", repository: SimulationRepository = D
     return repository.list_rewards(campaign_id)
 
 
+@router.post("/encounters/{encounter_id}/resolve")
+def resolve_encounter(encounter_id: str, payload: EncounterResolution,
+                      simulation: SimulationRepository = Depends(get_simulation_repository),
+                      operations: OperationsRepository = Depends(get_operations_repository),
+                      party_repo: PartyRepository = Depends(get_party_repository),
+                      world: SQLiteRepository = Depends(get_repository)):
+    encounter = simulation.get_encounter(encounter_id)
+    if not encounter:
+        raise HTTPException(status_code=404, detail="Encounter no trobat")
+    simulation.update_encounter_status(encounter_id, "resolved")
+    if payload.xp:
+        characters = party_repo.list_characters(encounter.campaign_id, active_only=True)
+        share = payload.xp // max(1, len(characters))
+        for character in characters:
+            party_repo.update_character(character.id, CharacterUpdate(xp=character.xp + share))
+    clock = operations.advance_clock(payload.advance_clock_id, payload.clock_steps) if payload.advance_clock_id and payload.clock_steps else None
+    quest = operations.update_record(payload.quest_id, CampaignRecordUpdate(status=payload.quest_status)) if payload.quest_id and payload.quest_status else None
+    reward = None
+    if payload.generate_reward:
+        reward = GenerationService(simulation, world).generate_reward(RewardRequest(
+            campaign_id=encounter.campaign_id, encounter_id=encounter.id, location_id=encounter.location_id,
+            terrain=encounter.terrain, party_level=encounter.party_level, difficulty=encounter.difficulty,
+        ))
+    activity = operations.add_activity(CampaignActivityCreate(
+        campaign_id=encounter.campaign_id, session_id=operations.active_session_id(encounter.campaign_id),
+        kind="encounter", title=f"{encounter.title}: {payload.outcome}", details=payload.summary,
+        linked_id=encounter.id, visibility="players",
+    ))
+    return {"encounter": simulation.get_encounter(encounter_id), "clock": clock, "quest": quest,
+            "reward": reward, "activity": activity}
+
+
 @router.post("/rewards/generate", status_code=status.HTTP_201_CREATED)
 def generate_reward(payload: RewardRequest, repository: SimulationRepository = Depends(get_simulation_repository), world: SQLiteRepository = Depends(get_repository)):
     try:
@@ -1072,7 +1222,8 @@ def generate_reward(payload: RewardRequest, repository: SimulationRepository = D
 @router.post("/rewards/{reward_id}/claim")
 def claim_reward(reward_id: str, payload: RewardClaimRequest,
                  simulation: SimulationRepository = Depends(get_simulation_repository),
-                 party_repo: PartyRepository = Depends(get_party_repository)):
+                 party_repo: PartyRepository = Depends(get_party_repository),
+                 operations: OperationsRepository = Depends(get_operations_repository)):
     reward = simulation.get_reward(reward_id)
     if not reward:
         raise HTTPException(status_code=404, detail="Recompensa no trobada")
@@ -1101,4 +1252,8 @@ def claim_reward(reward_id: str, payload: RewardClaimRequest,
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     claimed = simulation.mark_reward_claimed(reward_id)
+    operations.add_activity(CampaignActivityCreate(campaign_id=reward.campaign_id,
+        session_id=operations.active_session_id(reward.campaign_id), kind="reward",
+        title=f"Botí reclamat: {reward.title}", details=", ".join(str(item.get("name", "Recompensa")) for item in reward.items),
+        linked_id=reward.id, visibility="players"))
     return {"reward": claimed, "items": created, "treasury": party_repo.get_treasury(reward.campaign_id)}

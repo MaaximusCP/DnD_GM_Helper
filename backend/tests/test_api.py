@@ -392,6 +392,54 @@ class APITests(unittest.TestCase):
         self.assertTrue(any(x["id"] == character_id for x in player["characters"]))
         self.assertIsNotNone(player["treasury"])
 
+    def test_v09_operations_session_resolution_and_hexcrawl_risk(self):
+        session = self.client.post("/api/sessions?campaign_id=demo").json()
+        quest = self.client.post("/api/campaign-records", json={
+            "campaign_id": "demo", "kind": "quest", "title": "Trobar el temple",
+            "visibility": "players", "due_day": 8, "data": {"objectives": ["Seguir el mapa"]},
+        })
+        clock = self.client.post("/api/campaign-records", json={
+            "campaign_id": "demo", "kind": "clock", "title": "Alerta yuan-ti",
+            "data": {"current": 0, "maximum": 4, "consequence": "Arriben reforcos"},
+        })
+        self.assertEqual(quest.status_code, 201)
+        self.assertEqual(clock.status_code, 201)
+        self.client.patch("/api/hexes/hex_demo_1_0", json={
+            "risk_level": 4, "alert_level": 2, "risk_tags": ["malaltia", "patrulles"],
+        })
+        travelled = self.client.post("/api/campaigns/demo/travel", json={
+            "destination_hex_id": "hex_demo_1_0", "pace": "fast",
+            "navigation_roll": 20, "encounter_roll": 100, "foraging_roll": 20,
+        })
+        self.assertEqual(travelled.status_code, 201)
+        destination = next(x for x in self.client.get("/api/campaigns/demo").json()["hex_cells"] if x["id"] == "hex_demo_1_0")
+        self.assertEqual(destination["risk_level"], 4)
+        self.assertEqual(destination["risk_tags"], ["malaltia", "patrulles"])
+        self.assertGreaterEqual(destination["alert_level"], 3)
+
+        encounter = self.client.post("/api/encounters/generate", json={
+            "campaign_id": "demo", "terrain": "jungle", "party_level": 4,
+            "party_size": 4, "difficulty": 3, "encounter_type": "combat",
+        }).json()
+        before_xp = sum(x["xp"] for x in self.client.get("/api/characters?campaign_id=demo").json())
+        resolved = self.client.post(f"/api/encounters/{encounter['id']}/resolve", json={
+            "outcome": "victory", "summary": "El grup supera l'emboscada", "xp": 900,
+            "advance_clock_id": clock.json()["id"], "clock_steps": 2,
+            "quest_id": quest.json()["id"], "quest_status": "completed", "generate_reward": True,
+        })
+        self.assertEqual(resolved.status_code, 200)
+        self.assertEqual(resolved.json()["clock"]["data"]["current"], 2)
+        self.assertEqual(resolved.json()["quest"]["status"], "completed")
+        self.assertIsNotNone(resolved.json()["reward"])
+        after_xp = sum(x["xp"] for x in self.client.get("/api/characters?campaign_id=demo").json())
+        self.assertGreater(after_xp, before_xp)
+        player = self.client.get("/api/player-view/demo").json()
+        self.assertTrue(any(x["id"] == quest.json()["id"] for x in player["quests"]))
+        closed = self.client.post(f"/api/sessions/{session['id']}/close", json={"summary": "", "share_summary": True})
+        self.assertEqual(closed.status_code, 200)
+        self.assertIn("Resum autom", closed.json()["summary"])
+        self.assertGreaterEqual(len(closed.json()["activities"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -377,6 +377,11 @@ class SQLiteRepository:
         with self.database.connect() as db:
             return [Session(**dict(row)) for row in db.execute("SELECT * FROM sessions WHERE campaign_id = ? ORDER BY started_at DESC", (campaign_id,))]
 
+    def get_session(self, session_id: str) -> Session | None:
+        with self.database.connect() as db:
+            row = db.execute("SELECT * FROM sessions WHERE id=?", (session_id,)).fetchone()
+        return Session(**dict(row)) if row else None
+
     def end_session(self, session_id: str, summary: str) -> Session | None:
         with self.database.connect() as db:
             db.execute("UPDATE sessions SET ended_at = ?, summary = ? WHERE id = ? AND ended_at IS NULL", (utc_now(), summary, session_id))
@@ -399,6 +404,12 @@ class SQLiteRepository:
             for row in db.execute("""SELECT m.id, n.name title, m.text excerpt FROM memories m JOIN npcs n ON n.id=m.npc_id
                                      WHERE n.campaign_id=? AND m.text LIKE ? LIMIT 10""", (campaign_id, like)):
                 results.append(SearchResult(kind="memory", **dict(row)))
+            for row in db.execute("""SELECT id,title,data excerpt FROM campaign_records
+                                     WHERE campaign_id=? AND (title LIKE ? OR data LIKE ?) LIMIT 15""", (campaign_id, like, like)):
+                results.append(SearchResult(kind="record", **dict(row)))
+            for row in db.execute("""SELECT id,title,details excerpt FROM campaign_activities
+                                     WHERE campaign_id=? AND (title LIKE ? OR details LIKE ?) LIMIT 15""", (campaign_id, like, like)):
+                results.append(SearchResult(kind="activity", **dict(row)))
         return results[:30]
 
     def export_campaign(self, campaign_id: str) -> CampaignBundle | None:
@@ -408,9 +419,11 @@ class SQLiteRepository:
         from app.infrastructure.simulation_repository import SimulationRepository
         from app.infrastructure.campaign_tools_repository import CampaignToolsRepository
         from app.infrastructure.party_repository import PartyRepository
+        from app.infrastructure.operations_repository import OperationsRepository
         simulation = SimulationRepository(self.database)
         tools = CampaignToolsRepository(self.database)
         party_repo = PartyRepository(self.database)
+        operations = OperationsRepository(self.database)
         return CampaignBundle(
             campaign=campaign, locations=self.list_locations(campaign_id), factions=self.list_factions(campaign_id),
             npcs=self.list_npcs(campaign_id), events=self.list_events(campaign_id, 10000),
@@ -428,6 +441,8 @@ class SQLiteRepository:
             characters=party_repo.list_characters(campaign_id), inventory=party_repo.list_inventory(campaign_id),
             treasury=party_repo.get_treasury(campaign_id),
             inventory_transactions=party_repo.list_transactions(campaign_id, 10000),
+            campaign_records=operations.list_records(campaign_id),
+            campaign_activities=operations.list_activities(campaign_id, 10000),
         )
 
     def import_campaign(self, package: CampaignBundle) -> Campaign:
@@ -491,7 +506,12 @@ class SQLiteRepository:
             for item in package.lore_entries:
                 db.execute("INSERT INTO lore_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (item.id, c.id, item.layer, item.category, item.title, item.content, item.source_id, item.location_id, item.created_at))
             for item in package.hex_cells:
-                db.execute("INSERT INTO hex_cells VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (item.id, c.id, item.q, item.r, item.terrain, item.title, item.discovery, item.travel_cost, item.encounter_chance, item.player_notes, item.dm_notes, item.location_id, item.source_id))
+                db.execute("""INSERT INTO hex_cells(id,campaign_id,q,r,terrain,title,discovery,travel_cost,encounter_chance,
+                           player_notes,dm_notes,location_id,source_id,risk_level,alert_level,risk_tags)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (item.id, c.id, item.q, item.r, item.terrain,
+                           item.title, item.discovery, item.travel_cost, item.encounter_chance, item.player_notes,
+                           item.dm_notes, item.location_id, item.source_id, item.risk_level, item.alert_level,
+                           json.dumps(item.risk_tags)))
             for combat in package.combats:
                 db.execute("""INSERT INTO combats(id,campaign_id,name,status,round,turn_index,encounter_id,summary,created_at)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (combat.id, c.id, combat.name, combat.status, combat.round, combat.turn_index, combat.encounter_id, combat.summary, combat.created_at))
@@ -505,7 +525,7 @@ class SQLiteRepository:
                                 json.dumps(item.conditions), json.dumps(item.actions), item.source_id, item.reference_id, item.character_id))
             if package.hexcrawl_settings:
                 item = package.hexcrawl_settings
-                db.execute("INSERT INTO hexcrawl_settings VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (c.id, int(item.track_weather), int(item.track_navigation), int(item.track_food), int(item.track_water), int(item.track_fatigue), int(item.track_encounters), int(item.track_foraging), int(item.auto_discover), item.default_pace, item.hex_distance, item.distance_unit))
+                db.execute("INSERT INTO hexcrawl_settings VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (c.id, int(item.track_weather), int(item.track_navigation), int(item.track_food), int(item.track_water), int(item.track_fatigue), int(item.track_encounters), int(item.track_foraging), int(item.auto_discover), item.default_pace, item.hex_distance, item.distance_unit, int(item.track_risk), int(item.track_alert), int(item.alert_decay)))
             else:
                 db.execute("INSERT INTO hexcrawl_settings(campaign_id) VALUES (?)", (c.id,))
             if package.player_view_settings:
@@ -543,4 +563,12 @@ class SQLiteRepository:
                 db.execute("INSERT INTO inventory_transactions VALUES (?,?,?,?,?,?,?,?,?,?)", (item.id, c.id, item.kind,
                            item.description, item.item_id, item.character_id, item.currency, item.currency_delta,
                            item.quantity_delta, item.created_at))
+            for item in package.campaign_records:
+                db.execute("INSERT INTO campaign_records VALUES (?,?,?,?,?,?,?,?,?,?,?)", (item.id, c.id, item.kind,
+                           item.title, item.status, item.visibility, item.due_day, item.linked_id,
+                           json.dumps(item.data), item.created_at, item.updated_at))
+            for item in package.campaign_activities:
+                db.execute("INSERT INTO campaign_activities VALUES (?,?,?,?,?,?,?,?,?)", (item.id, c.id,
+                           item.session_id, item.kind, item.title, item.details, item.visibility,
+                           item.linked_id, item.created_at))
         return self.get_campaign(c.id)  # type: ignore[return-value]

@@ -51,21 +51,28 @@ class CampaignToolsRepository:
 
     def list_hexes(self, campaign_id: str) -> list[HexCell]:
         with self.database.connect() as db:
-            return [HexCell(**dict(row)) for row in db.execute("SELECT * FROM hex_cells WHERE campaign_id=? ORDER BY r,q", (campaign_id,))]
+            return [self._hex(row) for row in db.execute("SELECT * FROM hex_cells WHERE campaign_id=? ORDER BY r,q", (campaign_id,))]
+
+    @staticmethod
+    def _hex(row) -> HexCell:
+        data = dict(row); data["risk_tags"] = json.loads(data.get("risk_tags") or "[]")
+        return HexCell(**data)
 
     def get_hex(self, item_id: str) -> HexCell | None:
         with self.database.connect() as db:
             row = db.execute("SELECT * FROM hex_cells WHERE id=?", (item_id,)).fetchone()
-        return HexCell(**dict(row)) if row else None
+        return self._hex(row) if row else None
 
     def create_hex(self, payload: HexCellCreate) -> HexCell:
         item = HexCell(id=f"hex_{uuid4().hex[:12]}", **payload.model_dump())
         try:
             with self.database.connect() as db:
-                db.execute("INSERT INTO hex_cells VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (
+                db.execute("""INSERT INTO hex_cells(id,campaign_id,q,r,terrain,title,discovery,travel_cost,encounter_chance,
+                           player_notes,dm_notes,location_id,source_id,risk_level,alert_level,risk_tags)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
                     item.id, item.campaign_id, item.q, item.r, item.terrain, item.title, item.discovery,
                     item.travel_cost, item.encounter_chance, item.player_notes, item.dm_notes,
-                    item.location_id, item.source_id,
+                    item.location_id, item.source_id, item.risk_level, item.alert_level, json.dumps(item.risk_tags),
                 ))
         except Exception as exc:
             raise ValueError("Ja existeix un hex amb aquestes coordenades") from exc
@@ -73,6 +80,8 @@ class CampaignToolsRepository:
 
     def update_hex(self, item_id: str, payload: HexCellUpdate) -> HexCell | None:
         values = payload.model_dump(exclude_none=True)
+        if "risk_tags" in values:
+            values["risk_tags"] = json.dumps(values["risk_tags"])
         with self.database.connect() as db:
             if not db.execute("SELECT 1 FROM hex_cells WHERE id=?", (item_id,)).fetchone():
                 return None
@@ -80,7 +89,7 @@ class CampaignToolsRepository:
                 assignments = ", ".join(f"{key}=?" for key in values)
                 db.execute(f"UPDATE hex_cells SET {assignments} WHERE id=?", (*values.values(), item_id))
             row = db.execute("SELECT * FROM hex_cells WHERE id=?", (item_id,)).fetchone()
-        return HexCell(**dict(row))
+        return self._hex(row)
 
     def reveal_hexes(self, campaign_id: str, payload: HexRevealRequest) -> list[HexCell]:
         center = self.get_hex(payload.center_hex_id)

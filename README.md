@@ -45,6 +45,13 @@ Aquest repositori implementa la **vertical slice 0.1** definida a [`projecte_gm_
 - tresoreria en cp, sp, ep, gp i pp amb ingressos, despeses i protecció contra saldos negatius;
 - reclamació de recompenses cap a inventari/tresoreria amb protecció contra duplicats;
 - sincronització de personatges amb combat, descansos i pantalla de jugadors;
+- Campaign Operations amb missions, objectius, calendari, venciments, clocks, amenaces i escenes;
+- Session Planner amb elements pendents, notes ràpides, registre automàtic i resum de tancament;
+- resolució d'encounters connectada a XP, missions, clocks, recompenses i cronologia;
+- progressió amb XP, fites, inspiració, Hit Dice i Death Saves;
+- mapes d'imatge locals amb marcadors percentuals i visibilitat DM/jugadors;
+- vincles entre documents de biblioteca, missions, escenes, mapes i notes de pàgina;
+- hexcrawl amb risc, etiquetes de perill i alerta dinàmica que modifica navegació i encounters;
 - API REST documentada automàticament amb OpenAPI.
 
 > El projecte no distribueix text, mapes, personatges ni altres continguts de cap aventura comercial. Pots importar-hi el contingut que tinguis dret a utilitzar.
@@ -179,7 +186,7 @@ La base de dades és la font de veritat. El LLM rep només el context rellevant 
 
 ## Abast actual i roadmap
 
-La versió 0.8 incorpora el Party Core complet: personatges, inventari, tresoreria, historial, botí reclamable i sincronització amb descansos, combat i pantalla de jugadors. També conserva Campaign Studio, el catàleg SRD local i el hexcrawl modular de la 0.7. Queden per a fases posteriors l'OCR, embeddings semàntics, mapes d'imatge amb marcadors, simulació d'NPC entre sessions i regles D&D 5e més exhaustives.
+La versió 0.9 incorpora Campaign Operations: missions, calendari, clocks, Session Planner, cronologia, resolució d'encounters, progressió, mapes amb marcadors, vincles documentals i risc/alerta al hexcrawl. Tot funciona localment, es pot ocultar per mòduls i forma part dels backups i paquets d'exportació. Queden per a la 1.0 l'OCR, embeddings semàntics, simulació autònoma d'NPC i sincronització remota opcional.
 
 El botó de controls de la capçalera obre les [preferències de la interfície](docs/ui-settings.md). Es pot simplificar el menú per sessió sense eliminar dades ni afectar altres navegadors.
 

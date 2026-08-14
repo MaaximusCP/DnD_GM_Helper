@@ -39,6 +39,8 @@ class PartyRepository:
     def create_character(self, payload: CharacterCreate) -> Character:
         data = payload.model_dump()
         data["current_hp"] = payload.max_hp if payload.current_hp is None else min(payload.current_hp, payload.max_hp)
+        data["hit_dice_max"] = payload.level if payload.hit_dice_max is None else payload.hit_dice_max
+        data["hit_dice_current"] = data["hit_dice_max"] if payload.hit_dice_current is None else payload.hit_dice_current
         item = Character(id=f"char_{uuid4().hex[:12]}", **data)
         values = item.model_dump()
         for key in JSON_CHARACTER_FIELDS:
@@ -90,7 +92,10 @@ class PartyRepository:
                     resource["current"] = resource["maximum"]
             update = {"resources": resources}
             if rest_type == "long":
-                update.update(current_hp=character.max_hp, temp_hp=0, spell_slots=dict(character.spell_slots_max), exhaustion=max(0, character.exhaustion - 1))
+                update.update(current_hp=character.max_hp, temp_hp=0, spell_slots=dict(character.spell_slots_max),
+                    exhaustion=max(0, character.exhaustion - 1),
+                    hit_dice_current=min(character.hit_dice_max, character.hit_dice_current + max(1, character.hit_dice_max // 2)),
+                    death_saves_success=0, death_saves_failure=0)
             self.update_character(character.id, CharacterUpdate(**update))
             recovered.append(character.name)
         return recovered
