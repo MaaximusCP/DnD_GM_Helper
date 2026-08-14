@@ -29,6 +29,13 @@ Aquest repositori implementa la **vertical slice 0.1** definida a [`projecte_gm_
 - editor visual de taules homebrew, terrenys, rangs, pesos i etiquetes;
 - catàleg local SRD 5.1 amb 1.252 objectes, peces d'equipament, monstres i encanteris;
 - integració del catàleg SRD amb Encounter Engine, Reward Engine i taules custom;
+- capes separades per a informació només DM, coneixement dels jugadors i estat real del món;
+- hexcrawl persistent de Chult amb descobriment, terreny, viatge, encounters i notes separades;
+- assistent de combat amb iniciativa, rondes, punts de vida, condicions i accions vinculables a fonts;
+- pantalla de jugadors en una URL independent que mai carrega secrets del DM;
+- hexcrawl modular amb clima, navegació, menjar, aigua, fatiga, foratge i encounters activables individualment;
+- dies de viatge amb ruta, ritme, tirades manuals o automàtiques, consum, descobriment i diari;
+- combat avançat amb PG temporals, concentració, reaccions, accions llegendàries, tirades i historial;
 - API REST documentada automàticament amb OpenAPI.
 
 > El projecte no distribueix text, mapes, personatges ni altres continguts de cap aventura comercial. Pots importar-hi el contingut que tinguis dret a utilitzar.
@@ -110,6 +117,8 @@ Els fitxers oficials comprats no s'inclouen als exports de campanya. L'export s�
 La capçalera permet canviar de campanya i obrir el gestor per crear, importar o arxivar mons. La vista `Món` administra la campanya, el nivell i la mida del grup, les localitzacions i les variables persistents. `Faccions` i `Taules custom` disposen d'editors visuals propis.
 
 Cap operació del frontend depèn ja de l'identificador `demo`; la campanya activa es conserva localment al navegador.
+
+Les vistes `Pantalla jugadors`, `Coneixement`, `Hexcrawl` i `Combat` incorporen dades inicials de mostra. La pantalla compartida s'obre amb `?player=<campaign_id>` i consulta un endpoint filtrat: mai rep lore del DM, notes secretes, hexàgons ocults ni accions enemigues. El format, la separació de visibilitat i el flux futur d'extracció des de documents estan descrits a [`docs/campaign-tools.md`](docs/campaign-tools.md). El mapa comercial de Chult no s'inclou al repositori; es pot carregar localment des de `Biblioteca` i vincular-lo mitjançant `source_id`.
 
 ## Catàleg SRD local
 

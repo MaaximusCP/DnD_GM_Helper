@@ -406,7 +406,9 @@ class SQLiteRepository:
         if not campaign:
             return None
         from app.infrastructure.simulation_repository import SimulationRepository
+        from app.infrastructure.campaign_tools_repository import CampaignToolsRepository
         simulation = SimulationRepository(self.database)
+        tools = CampaignToolsRepository(self.database)
         return CampaignBundle(
             campaign=campaign, locations=self.list_locations(campaign_id), factions=self.list_factions(campaign_id),
             npcs=self.list_npcs(campaign_id), events=self.list_events(campaign_id, 10000),
@@ -415,6 +417,12 @@ class SQLiteRepository:
             rumors=simulation.list_rumors(campaign_id), generation_tables=simulation.list_tables(campaign_id),
             generation_entries=simulation.list_campaign_entries(campaign_id), encounters=simulation.list_encounters(campaign_id),
             rewards=simulation.list_rewards(campaign_id),
+            lore_entries=tools.list_lore(campaign_id), hex_cells=tools.list_hexes(campaign_id),
+            combats=tools.list_combats(campaign_id),
+            hexcrawl_settings=tools.get_hexcrawl_settings(campaign_id),
+            expedition_state=tools.get_expedition_state(campaign_id),
+            travel_logs=tools.list_travel_logs(campaign_id, 10000),
+            player_view_settings=tools.get_player_view_settings(campaign_id),
         )
 
     def import_campaign(self, package: CampaignBundle) -> Campaign:
@@ -470,4 +478,41 @@ class SQLiteRepository:
                 db.execute("INSERT INTO encounters VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (item.id, c.id, item.location_id, item.terrain, item.party_level, item.party_size, item.difficulty, item.encounter_type, item.title, item.description, json.dumps(item.objectives), json.dumps(item.complications), json.dumps(item.context_reasons), item.status, item.created_at))
             for item in package.rewards:
                 db.execute("INSERT INTO rewards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (item.id, c.id, item.encounter_id, item.location_id, item.terrain, item.party_level, item.difficulty, item.mode, item.fortune_roll, item.tier, item.title, json.dumps(item.items), json.dumps(item.narrative_rewards), json.dumps(item.context_reasons), item.created_at))
+            for item in package.lore_entries:
+                db.execute("INSERT INTO lore_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (item.id, c.id, item.layer, item.category, item.title, item.content, item.source_id, item.location_id, item.created_at))
+            for item in package.hex_cells:
+                db.execute("INSERT INTO hex_cells VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (item.id, c.id, item.q, item.r, item.terrain, item.title, item.discovery, item.travel_cost, item.encounter_chance, item.player_notes, item.dm_notes, item.location_id, item.source_id))
+            for combat in package.combats:
+                db.execute("""INSERT INTO combats(id,campaign_id,name,status,round,turn_index,encounter_id,summary,created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (combat.id, c.id, combat.name, combat.status, combat.round, combat.turn_index, combat.encounter_id, combat.summary, combat.created_at))
+                for item in combat.combatants:
+                    db.execute("""INSERT INTO combatants(id,combat_id,name,kind,initiative,armor_class,max_hp,current_hp,temp_hp,
+                               initiative_bonus,concentration,reaction_available,legendary_actions,legendary_actions_max,notes,
+                               conditions,actions,source_id,reference_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                               (item.id, combat.id, item.name, item.kind, item.initiative, item.armor_class, item.max_hp,
+                                item.current_hp, item.temp_hp, item.initiative_bonus, int(item.concentration),
+                                int(item.reaction_available), item.legendary_actions, item.legendary_actions_max, item.notes,
+                                json.dumps(item.conditions), json.dumps(item.actions), item.source_id, item.reference_id))
+            if package.hexcrawl_settings:
+                item = package.hexcrawl_settings
+                db.execute("INSERT INTO hexcrawl_settings VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (c.id, int(item.track_weather), int(item.track_navigation), int(item.track_food), int(item.track_water), int(item.track_fatigue), int(item.track_encounters), int(item.track_foraging), int(item.auto_discover), item.default_pace, item.hex_distance, item.distance_unit))
+            else:
+                db.execute("INSERT INTO hexcrawl_settings(campaign_id) VALUES (?)", (c.id,))
+            if package.player_view_settings:
+                item = package.player_view_settings
+                db.execute("INSERT INTO player_view_settings VALUES (?,?,?,?,?,?,?,?)", (c.id, int(item.enabled), int(item.show_map), int(item.show_rumors), int(item.show_resources), int(item.show_weather), int(item.show_combat), int(item.show_enemy_hp)))
+            else:
+                db.execute("INSERT INTO player_view_settings(campaign_id) VALUES (?)", (c.id,))
+            if package.expedition_state:
+                item = package.expedition_state
+                db.execute("INSERT INTO expedition_state VALUES (?,?,?,?,?,?,?,?,?)", (c.id, item.current_hex_id, item.food, item.water, item.supplies, item.exhaustion, int(item.lost), item.weather, item.updated_at))
+            for item in package.travel_logs:
+                db.execute("""INSERT INTO travel_logs(id,campaign_id,origin_hex_id,destination_hex_id,route,pace,days,
+                           distance,distance_unit,weather,navigation_roll,encounter_roll,food_used,water_used,exhaustion_delta,
+                           encounter_triggered,encounter_id,reached_destination,notes,created_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (item.id, c.id, item.origin_hex_id,
+                           item.destination_hex_id, json.dumps(item.route), item.pace, item.days, item.distance,
+                           item.distance_unit, item.weather, item.navigation_roll, item.encounter_roll, item.food_used, item.water_used,
+                           item.exhaustion_delta, int(item.encounter_triggered), item.encounter_id,
+                           int(item.reached_destination), json.dumps(item.notes), item.created_at))
         return self.get_campaign(c.id)  # type: ignore[return-value]

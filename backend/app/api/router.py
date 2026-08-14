@@ -1,4 +1,6 @@
 from pathlib import Path
+import re
+import secrets
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 
@@ -8,6 +10,7 @@ from app.application.backup_service import BackupService
 from app.application.document_service import DocumentService
 from app.application.generation_service import GenerationService
 from app.application.rumor_service import RumorService
+from app.application.travel_service import TravelService
 from app.config import Settings, get_settings
 from app.domain.models import (
     CampaignBundle, CampaignCreate, CampaignUpdate, EventAnalyzeRequest, EventProposal,
@@ -17,7 +20,13 @@ from app.domain.models import (
     RestoreBackupRequest, PartySettingsUpdate, WorldStateUpdate,
     EncounterRequest, GenerationEntryCreate, GenerationTableCreate,
     GenerationTableUpdate, KnowledgeCreate, RewardRequest, RumorCreate,
+    CombatCreate, CombatUpdate, CombatantCreate, CombatantUpdate,
+    ReferenceCombatantCreate,
+    HexCellCreate, HexCellUpdate, LoreEntryCreate, LoreEntryUpdate,
+    CombatantDuplicate, CombatRollRequest, InitiativeRequest,
+    ExpeditionStateUpdate, HexcrawlSettingsUpdate, PlayerViewSettingsUpdate, TravelRequest,
 )
+from app.infrastructure.campaign_tools_repository import CampaignToolsRepository
 from app.infrastructure.content_repository import ContentRepository
 from app.infrastructure.database import Database
 from app.infrastructure.llm import create_provider
@@ -41,6 +50,10 @@ def get_simulation_repository(settings: Settings = Depends(get_settings)) -> Sim
     return SimulationRepository(Database(settings.database_path))
 
 
+def get_campaign_tools_repository(settings: Settings = Depends(get_settings)) -> CampaignToolsRepository:
+    return CampaignToolsRepository(Database(settings.database_path))
+
+
 @router.get("/health")
 def health(settings: Settings = Depends(get_settings)) -> dict[str, str]:
     return {"status": "ok", "llm_provider": settings.llm_provider}
@@ -57,7 +70,7 @@ def create_campaign(payload: CampaignCreate, repository: SQLiteRepository = Depe
 
 
 @router.get("/campaigns/{campaign_id}")
-def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_repository)):
+def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_repository), tools: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
     campaign = repository.get_campaign(campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campanya no trobada")
@@ -76,6 +89,13 @@ def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_r
         "encounters": SimulationRepository(repository.database).list_encounters(campaign_id),
         "rewards": SimulationRepository(repository.database).list_rewards(campaign_id),
         "generation_tables": SimulationRepository(repository.database).list_tables(campaign_id),
+        "lore_entries": tools.list_lore(campaign_id),
+        "hex_cells": tools.list_hexes(campaign_id),
+        "combats": tools.list_combats(campaign_id),
+        "hexcrawl_settings": tools.get_hexcrawl_settings(campaign_id),
+        "expedition_state": tools.get_expedition_state(campaign_id),
+        "travel_logs": tools.list_travel_logs(campaign_id),
+        "player_view_settings": tools.get_player_view_settings(campaign_id),
     }
 
 
@@ -486,6 +506,262 @@ def propagate_rumor(rumor_id: str, repository: SimulationRepository = Depends(ge
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"rumor_id": rumor_id, "learned_by": learned}
+
+
+@router.get("/lore")
+def list_lore(campaign_id: str = "demo", layer: str | None = None, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if layer and layer not in {"dm", "players", "world"}:
+        raise HTTPException(status_code=422, detail="Capa de coneixement no vàlida")
+    return repository.list_lore(campaign_id, layer)
+
+
+@router.post("/lore", status_code=status.HTTP_201_CREATED)
+def create_lore(payload: LoreEntryCreate, world: SQLiteRepository = Depends(get_repository), repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if not world.get_campaign(payload.campaign_id):
+        raise HTTPException(status_code=404, detail="Campanya no trobada")
+    return repository.create_lore(payload)
+
+
+@router.patch("/lore/{item_id}")
+def update_lore(item_id: str, payload: LoreEntryUpdate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    item = repository.update_lore(item_id, payload)
+    if not item:
+        raise HTTPException(status_code=404, detail="Entrada de coneixement no trobada")
+    return item
+
+
+@router.delete("/lore/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_lore(item_id: str, confirm: bool = False, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if not confirm:
+        raise HTTPException(status_code=409, detail="Cal confirm=true per eliminar l'entrada")
+    if not repository.delete_lore(item_id):
+        raise HTTPException(status_code=404, detail="Entrada de coneixement no trobada")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/hexes")
+def list_hexes(campaign_id: str = "demo", repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    return repository.list_hexes(campaign_id)
+
+
+@router.post("/hexes", status_code=status.HTTP_201_CREATED)
+def create_hex(payload: HexCellCreate, world: SQLiteRepository = Depends(get_repository), repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if not world.get_campaign(payload.campaign_id):
+        raise HTTPException(status_code=404, detail="Campanya no trobada")
+    try:
+        return repository.create_hex(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.patch("/hexes/{item_id}")
+def update_hex(item_id: str, payload: HexCellUpdate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    item = repository.update_hex(item_id, payload)
+    if not item:
+        raise HTTPException(status_code=404, detail="Hex no trobat")
+    return item
+
+
+@router.get("/campaigns/{campaign_id}/hexcrawl-settings")
+def get_hexcrawl_settings(campaign_id: str, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    return repository.get_hexcrawl_settings(campaign_id)
+
+
+@router.patch("/campaigns/{campaign_id}/hexcrawl-settings")
+def update_hexcrawl_settings(campaign_id: str, payload: HexcrawlSettingsUpdate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    return repository.update_hexcrawl_settings(campaign_id, payload)
+
+
+@router.get("/campaigns/{campaign_id}/expedition")
+def get_expedition(campaign_id: str, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    return {"state": repository.get_expedition_state(campaign_id), "logs": repository.list_travel_logs(campaign_id)}
+
+
+@router.patch("/campaigns/{campaign_id}/expedition")
+def update_expedition(campaign_id: str, payload: ExpeditionStateUpdate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    return repository.update_expedition_state(campaign_id, payload)
+
+
+@router.post("/campaigns/{campaign_id}/travel", status_code=status.HTTP_201_CREATED)
+def travel(campaign_id: str, payload: TravelRequest, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), world: SQLiteRepository = Depends(get_repository), simulation: SimulationRepository = Depends(get_simulation_repository)):
+    try:
+        return TravelService(repository, world, simulation).travel(campaign_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/campaigns/{campaign_id}/player-view-settings")
+def get_player_view_settings(campaign_id: str, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    return repository.get_player_view_settings(campaign_id)
+
+
+@router.patch("/campaigns/{campaign_id}/player-view-settings")
+def update_player_view_settings(campaign_id: str, payload: PlayerViewSettingsUpdate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    return repository.update_player_view_settings(campaign_id, payload)
+
+
+@router.get("/player-view/{campaign_id}")
+def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_repository), repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), simulation: SimulationRepository = Depends(get_simulation_repository)):
+    campaign = world.get_campaign(campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campanya no trobada")
+    settings = repository.get_player_view_settings(campaign_id)
+    if not settings.enabled:
+        raise HTTPException(status_code=403, detail="La pantalla de jugadors està desactivada")
+    expedition = repository.get_expedition_state(campaign_id)
+    visible_hexes = []
+    if settings.show_map:
+        for item in repository.list_hexes(campaign_id):
+            if item.discovery == "hidden":
+                continue
+            visible_hexes.append({
+                "id": item.id, "q": item.q, "r": item.r, "terrain": item.terrain,
+                "title": item.title, "discovery": item.discovery, "player_notes": item.player_notes,
+            })
+    combats = []
+    if settings.show_combat:
+        for combat in repository.list_combats(campaign_id):
+            if combat.status != "active":
+                continue
+            combatants = []
+            for item in combat.combatants:
+                hp_status = "down" if item.current_hp == 0 else "bloodied" if item.current_hp <= item.max_hp / 2 else "standing"
+                visible_hp = item.kind in {"player", "ally"} or settings.show_enemy_hp
+                combatants.append({
+                    "id": item.id, "name": item.name, "kind": item.kind, "initiative": item.initiative,
+                    "conditions": item.conditions, "concentration": item.concentration, "hp_status": hp_status,
+                    "current_hp": item.current_hp if visible_hp else None,
+                    "max_hp": item.max_hp if visible_hp else None,
+                })
+            combats.append({"id": combat.id, "name": combat.name, "round": combat.round, "turn_index": combat.turn_index, "combatants": combatants})
+    return {
+        "campaign": {"id": campaign.id, "name": campaign.name, "current_day": campaign.current_day},
+        "party": {"name": world.get_party_settings(campaign_id).name},
+        "lore": [item.model_dump() for item in repository.list_lore(campaign_id, "players")],
+        "hexes": visible_hexes,
+        "rumors": [item.model_dump() for item in simulation.list_rumors(campaign_id) if item.status == "active"] if settings.show_rumors else [],
+        "expedition": {"food": expedition.food, "water": expedition.water, "supplies": expedition.supplies,
+                       "exhaustion": expedition.exhaustion, "lost": expedition.lost,
+                       "weather": expedition.weather if settings.show_weather else None} if settings.show_resources else None,
+        "combats": combats, "settings": settings,
+    }
+
+
+@router.get("/combats")
+def list_combats(campaign_id: str = "demo", repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    return repository.list_combats(campaign_id)
+
+
+@router.post("/combats", status_code=status.HTTP_201_CREATED)
+def create_combat(payload: CombatCreate, world: SQLiteRepository = Depends(get_repository), repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if not world.get_campaign(payload.campaign_id):
+        raise HTTPException(status_code=404, detail="Campanya no trobada")
+    return repository.create_combat(payload)
+
+
+@router.patch("/combats/{combat_id}")
+def update_combat(combat_id: str, payload: CombatUpdate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    item = repository.update_combat(combat_id, payload)
+    if not item:
+        raise HTTPException(status_code=404, detail="Combat no trobat")
+    return item
+
+
+@router.post("/combats/{combat_id}/combatants", status_code=status.HTTP_201_CREATED)
+def add_combatant(combat_id: str, payload: CombatantCreate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    try:
+        return repository.add_combatant(combat_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/combats/{combat_id}/combatants/from-reference", status_code=status.HTTP_201_CREATED)
+def add_reference_combatant(combat_id: str, payload: ReferenceCombatantCreate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    reference = ReferenceCatalog().get(payload.reference_id)
+    if not reference or reference.get("category") != "monsters":
+        raise HTTPException(status_code=404, detail="Monstre no trobat al catàleg SRD")
+    data = reference.get("data", {})
+    raw_ac = data.get("armor_class", 10)
+    armor_class = raw_ac[0].get("value", 10) if isinstance(raw_ac, list) and raw_ac else raw_ac if isinstance(raw_ac, int) else 10
+    actions = [{"name": action.get("name", "Acció"), "description": action.get("desc", ""), "source": "SRD 5.1"}
+               for action in data.get("actions", [])[:20]]
+    try:
+        created = [repository.add_combatant(combat_id, CombatantCreate(
+            name=(payload.name or reference["name"]) + (f" {index + 1}" if payload.quantity > 1 else ""),
+            kind="enemy", initiative=payload.initiative - index,
+            armor_class=armor_class, max_hp=max(1, int(data.get("hit_points", 1))), actions=actions,
+            reference_id=payload.reference_id,
+        )) for index in range(payload.quantity)]
+        return created[0] if payload.quantity == 1 else created
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.patch("/combatants/{item_id}")
+def update_combatant(item_id: str, payload: CombatantUpdate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    item = repository.update_combatant(item_id, payload)
+    if not item:
+        raise HTTPException(status_code=404, detail="Combatent no trobat")
+    return item
+
+
+@router.delete("/combatants/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_combatant(item_id: str, confirm: bool = False, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if not confirm:
+        raise HTTPException(status_code=409, detail="Cal confirm=true per eliminar el combatent")
+    if not repository.delete_combatant(item_id):
+        raise HTTPException(status_code=404, detail="Combatent no trobat")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/combatants/{item_id}/duplicate", status_code=status.HTTP_201_CREATED)
+def duplicate_combatant(item_id: str, payload: CombatantDuplicate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    try:
+        return repository.duplicate_combatant(item_id, payload.quantity)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/combats/{combat_id}/next-turn")
+def next_combat_turn(combat_id: str, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    item = repository.next_turn(combat_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Combat no trobat")
+    return item
+
+
+@router.post("/combats/{combat_id}/initiative")
+def roll_combat_initiative(combat_id: str, payload: InitiativeRequest, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    combat = repository.get_combat(combat_id)
+    if not combat:
+        raise HTTPException(status_code=404, detail="Combat no trobat")
+    rolls = {item.id: secrets.randbelow(20) + 1 for item in combat.combatants} if payload.automatic else payload.rolls
+    item = repository.roll_initiative(combat_id, rolls)
+    return item
+
+
+@router.get("/combats/{combat_id}/log")
+def get_combat_log(combat_id: str, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if not repository.get_combat(combat_id):
+        raise HTTPException(status_code=404, detail="Combat no trobat")
+    return repository.list_combat_logs(combat_id)
+
+
+@router.post("/combats/{combat_id}/roll")
+def combat_roll(combat_id: str, payload: CombatRollRequest, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if not repository.get_combat(combat_id):
+        raise HTTPException(status_code=404, detail="Combat no trobat")
+    match = re.fullmatch(r"(\d{1,2})d(\d{1,3})([+-]\d{1,4})?", payload.notation.replace(" ", "").lower())
+    if not match:
+        raise HTTPException(status_code=422, detail="Notació no vàlida; utilitza per exemple 1d20+5")
+    count, sides, modifier = int(match.group(1)), int(match.group(2)), int(match.group(3) or 0)
+    if count > 20 or sides > 100 or sides < 2:
+        raise HTTPException(status_code=422, detail="La tirada supera els límits permesos")
+    dice = [secrets.randbelow(sides) + 1 for _ in range(count)]
+    total = sum(dice) + modifier
+    message = f"{payload.label}: {payload.notation} = {total} ({dice}{modifier:+d})"
+    repository.add_combat_log(combat_id, message, "roll")
+    return {"notation": payload.notation, "dice": dice, "modifier": modifier, "total": total, "label": payload.label}
 
 
 @router.get("/generation-tables")

@@ -1,5 +1,40 @@
 # Registre de canvis
 
+## 2026-08-14 14:26 — Player View, hexcrawl modular i combat avançat
+
+Hora: 14:26, Europe/Madrid.
+
+Canvi fet:
+
+- creada una pantalla de jugadors independent amb endpoint filtrat i actualització automàtica;
+- afegida configuració de mapa, rumors, recursos, clima, combat i PG enemics compartits;
+- implementats clima, navegació, menjar, aigua, fatiga, foratge, encounters i descobriment com a regles activables;
+- creat el motor de rutes axials i dies de viatge amb ritme, tirades manuals o automàtiques, consum i diari;
+- connectada la generació automàtica d'encounters contextuals durant el viatge;
+- ampliat el combat amb PG temporals, bonus d'iniciativa, concentració, reaccions, accions llegendàries i notes;
+- afegits cercador de monstres SRD, quantitats, duplicació, tirades d'iniciativa, notació de daus i historial;
+- ampliades migracions SQLite, exportació/importació, API, proves, responsive i documentació.
+
+Motiu: permetre adaptar la complexitat a cada sessió, oferir una pantalla segura als jugadors i fer que exploració i combat funcionin com fluxos complets.
+
+## 2026-08-14 13:59 — Coneixement, hexcrawl i combat
+
+Hora: 13:59, Europe/Madrid.
+
+Canvi fet:
+
+- separada la informació canònica en capes `DM only`, coneixement dels jugadors i estat real del món;
+- afegit CRUD persistent de lore amb procedència documental i ubicació opcionals;
+- implementat un hexcrawl de Chult amb coordenades, descobriment, terreny, cost de viatge, probabilitat d'encounter i notes separades;
+- preparat l'enllaç del mapa oficial carregat localment sense distribuir-lo al repositori;
+- creat un assistent de combat amb iniciativa, rondes, PG, CA, condicions, accions i procedència;
+- afegit un adaptador API que crea enemics amb estadístiques i accions del catàleg SRD local;
+- incorporades dades de mostra per a les tres capes, cinc hexàgons i un combat;
+- corregida la propagació de rumors perquè una probabilitat del 100% sigui realment garantida;
+- ampliats dashboard, exportació/importació, API, frontend responsive, proves i documentació.
+
+Motiu: disposar d'eines completes de preparació i sessió que mantinguin els secrets del DM i permetin incorporar en el futur dades revisades des dels documents locals.
+
 ## 2026-08-07 16:58 — Fortuna manual al Reward Engine
 
 Hora: 16:58, Europe/Madrid.

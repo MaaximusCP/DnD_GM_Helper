@@ -1,4 +1,4 @@
-# API local 0.4
+# API local 0.6
 
 Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interactiva completa a `/docs`.
 
@@ -43,6 +43,25 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `GET/POST` | `/npcs/{id}/knowledge` | Consulta o afegeix coneixement diferenciat |
 | `GET/POST` | `/rumors` | Consulta o crea rumors |
 | `POST` | `/rumors/{id}/propagate` | Propaga el rumor idempotentment als NPC |
+| `GET/POST` | `/lore` | Consulta o crea informació separada per capa `dm`, `players` o `world` |
+| `PATCH/DELETE` | `/lore/{id}` | Edita, mou de capa o elimina una entrada de coneixement |
+| `GET/POST` | `/hexes` | Consulta o crea hexàgons de la campanya |
+| `PATCH` | `/hexes/{id}` | Actualitza descobriment, viatge, encounter i notes de l'hex |
+| `GET/PATCH` | `/campaigns/{id}/hexcrawl-settings` | Consulta o activa cada subsistema de l'hexcrawl |
+| `GET/PATCH` | `/campaigns/{id}/expedition` | Estat de recursos, posició, clima, esgotament i diari |
+| `POST` | `/campaigns/{id}/travel` | Resol una ruta amb ritme, regles actives i tirades opcionals |
+| `GET/PATCH` | `/campaigns/{id}/player-view-settings` | Configura la informació compartida amb els jugadors |
+| `GET` | `/player-view/{id}` | Projecció filtrada sense dades secretes del DM |
+| `GET/POST` | `/combats` | Consulta o crea combats persistents |
+| `PATCH` | `/combats/{id}` | Reanomena, finalitza o reobre un combat |
+| `POST` | `/combats/{id}/combatants` | Afegeix un combatent amb estadístiques i accions |
+| `POST` | `/combats/{id}/combatants/from-reference` | Crea un enemic amb CA, PG i accions del catàleg SRD |
+| `PATCH/DELETE` | `/combatants/{id}` | Actualitza PG, condicions o dades del combatent, o l'elimina |
+| `POST` | `/combats/{id}/next-turn` | Avança iniciativa i incrementa la ronda quan correspon |
+| `POST` | `/combatants/{id}/duplicate` | Duplica un enemic o plantilla dins del combat |
+| `POST` | `/combats/{id}/initiative` | Calcula iniciativa automàtica o aplica tirades manuals |
+| `GET` | `/combats/{id}/log` | Historial persistent del combat |
+| `POST` | `/combats/{id}/roll` | Resol una notació limitada com `2d6+3` i la registra |
 | `GET/POST` | `/generation-tables` | Llista o crea taules homebrew |
 | `PATCH/DELETE` | `/generation-tables/{id}` | Edita o elimina una taula i les entrades associades |
 | `GET/POST` | `/generation-tables/{id}/entries` | Llista o afegeix opcions contextuals |

@@ -35,11 +35,10 @@ class RumorService:
                 continue
             seed = int(hashlib.sha256(f"{rumor.id}:{npc.id}".encode()).hexdigest()[:16], 16)
             chance = rumor.spread + (0.2 if npc.location_id == rumor.origin_location_id else 0)
-            if random.Random(seed).random() <= min(chance, 0.98):
+            if random.Random(seed).random() <= min(chance, 1.0):
                 self.repository.add_knowledge(npc.id, KnowledgeCreate(
                     subject=rumor.subject, content=rumor.content, confidence=rumor.credibility,
                     truth_status="belief", source_type="rumor", source_id=rumor.id,
                 ))
                 learned.append(npc.id)
         return learned
-

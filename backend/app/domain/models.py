@@ -96,6 +96,299 @@ class WorldStateUpdate(BaseModel):
     value: int | str
 
 
+class LoreEntry(BaseModel):
+    id: str
+    campaign_id: str
+    layer: Literal["dm", "players", "world"]
+    category: Literal["lore", "npc", "location", "quest", "rule", "other"] = "lore"
+    title: str
+    content: str
+    source_id: str | None = None
+    location_id: str | None = None
+    created_at: str = Field(default_factory=utc_now)
+
+
+class LoreEntryCreate(BaseModel):
+    campaign_id: str = "demo"
+    layer: Literal["dm", "players", "world"] = "dm"
+    category: Literal["lore", "npc", "location", "quest", "rule", "other"] = "lore"
+    title: str = Field(min_length=2, max_length=200)
+    content: str = Field(min_length=2, max_length=10000)
+    source_id: str | None = None
+    location_id: str | None = None
+
+
+class LoreEntryUpdate(BaseModel):
+    layer: Literal["dm", "players", "world"] | None = None
+    category: Literal["lore", "npc", "location", "quest", "rule", "other"] | None = None
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    content: str | None = Field(default=None, min_length=2, max_length=10000)
+    source_id: str | None = None
+    location_id: str | None = None
+
+
+class HexCell(BaseModel):
+    id: str
+    campaign_id: str
+    q: int = Field(ge=-100, le=100)
+    r: int = Field(ge=-100, le=100)
+    terrain: str = "jungle"
+    title: str = "Hex desconegut"
+    discovery: Literal["hidden", "discovered", "explored"] = "hidden"
+    travel_cost: int = Field(default=1, ge=1, le=10)
+    encounter_chance: int = Field(default=20, ge=0, le=100)
+    player_notes: str = ""
+    dm_notes: str = ""
+    location_id: str | None = None
+    source_id: str | None = None
+
+
+class HexCellCreate(BaseModel):
+    campaign_id: str = "demo"
+    q: int = Field(ge=-100, le=100)
+    r: int = Field(ge=-100, le=100)
+    terrain: str = Field(default="jungle", max_length=40)
+    title: str = Field(default="Hex desconegut", min_length=2, max_length=160)
+    discovery: Literal["hidden", "discovered", "explored"] = "hidden"
+    travel_cost: int = Field(default=1, ge=1, le=10)
+    encounter_chance: int = Field(default=20, ge=0, le=100)
+    player_notes: str = Field(default="", max_length=5000)
+    dm_notes: str = Field(default="", max_length=5000)
+    location_id: str | None = None
+    source_id: str | None = None
+
+
+class HexCellUpdate(BaseModel):
+    terrain: str | None = Field(default=None, max_length=40)
+    title: str | None = Field(default=None, min_length=2, max_length=160)
+    discovery: Literal["hidden", "discovered", "explored"] | None = None
+    travel_cost: int | None = Field(default=None, ge=1, le=10)
+    encounter_chance: int | None = Field(default=None, ge=0, le=100)
+    player_notes: str | None = Field(default=None, max_length=5000)
+    dm_notes: str | None = Field(default=None, max_length=5000)
+    location_id: str | None = None
+    source_id: str | None = None
+
+
+class HexcrawlSettings(BaseModel):
+    campaign_id: str
+    track_weather: bool = True
+    track_navigation: bool = True
+    track_food: bool = True
+    track_water: bool = True
+    track_fatigue: bool = True
+    track_encounters: bool = True
+    track_foraging: bool = True
+    auto_discover: bool = True
+    default_pace: Literal["slow", "normal", "fast"] = "normal"
+    hex_distance: float = Field(default=10, gt=0, le=1000)
+    distance_unit: Literal["km", "miles"] = "km"
+
+
+class HexcrawlSettingsUpdate(BaseModel):
+    track_weather: bool | None = None
+    track_navigation: bool | None = None
+    track_food: bool | None = None
+    track_water: bool | None = None
+    track_fatigue: bool | None = None
+    track_encounters: bool | None = None
+    track_foraging: bool | None = None
+    auto_discover: bool | None = None
+    default_pace: Literal["slow", "normal", "fast"] | None = None
+    hex_distance: float | None = Field(default=None, gt=0, le=1000)
+    distance_unit: Literal["km", "miles"] | None = None
+
+
+class ExpeditionState(BaseModel):
+    campaign_id: str
+    current_hex_id: str | None = None
+    food: float = Field(default=40, ge=0, le=100000)
+    water: float = Field(default=80, ge=0, le=100000)
+    supplies: float = Field(default=10, ge=0, le=100000)
+    exhaustion: int = Field(default=0, ge=0, le=6)
+    lost: bool = False
+    weather: str = "clear"
+    updated_at: str = Field(default_factory=utc_now)
+
+
+class ExpeditionStateUpdate(BaseModel):
+    current_hex_id: str | None = None
+    food: float | None = Field(default=None, ge=0, le=100000)
+    water: float | None = Field(default=None, ge=0, le=100000)
+    supplies: float | None = Field(default=None, ge=0, le=100000)
+    exhaustion: int | None = Field(default=None, ge=0, le=6)
+    lost: bool | None = None
+    weather: str | None = Field(default=None, max_length=80)
+
+
+class TravelRequest(BaseModel):
+    destination_hex_id: str
+    pace: Literal["slow", "normal", "fast"] | None = None
+    navigation_roll: int | None = Field(default=None, ge=1, le=40)
+    encounter_roll: int | None = Field(default=None, ge=1, le=100)
+    foraging_roll: int | None = Field(default=None, ge=1, le=40)
+    manual_weather: str | None = Field(default=None, max_length=80)
+
+
+class TravelLog(BaseModel):
+    id: str
+    campaign_id: str
+    origin_hex_id: str | None = None
+    destination_hex_id: str
+    route: list[str] = Field(default_factory=list)
+    pace: str
+    days: int = 1
+    distance: float = 0
+    distance_unit: str = "km"
+    weather: str = "clear"
+    navigation_roll: int | None = None
+    encounter_roll: int | None = None
+    food_used: float = 0
+    water_used: float = 0
+    exhaustion_delta: int = 0
+    encounter_triggered: bool = False
+    encounter_id: str | None = None
+    reached_destination: bool = True
+    notes: list[str] = Field(default_factory=list)
+    created_at: str = Field(default_factory=utc_now)
+
+
+class PlayerViewSettings(BaseModel):
+    campaign_id: str
+    enabled: bool = True
+    show_map: bool = True
+    show_rumors: bool = True
+    show_resources: bool = True
+    show_weather: bool = True
+    show_combat: bool = True
+    show_enemy_hp: bool = False
+
+
+class PlayerViewSettingsUpdate(BaseModel):
+    enabled: bool | None = None
+    show_map: bool | None = None
+    show_rumors: bool | None = None
+    show_resources: bool | None = None
+    show_weather: bool | None = None
+    show_combat: bool | None = None
+    show_enemy_hp: bool | None = None
+
+
+class Combatant(BaseModel):
+    id: str
+    combat_id: str
+    name: str
+    kind: Literal["player", "enemy", "ally", "neutral"] = "enemy"
+    initiative: int = Field(default=10, ge=-10, le=50)
+    armor_class: int = Field(default=10, ge=0, le=40)
+    max_hp: int = Field(default=1, ge=1, le=10000)
+    current_hp: int = Field(default=1, ge=0, le=10000)
+    temp_hp: int = Field(default=0, ge=0, le=10000)
+    initiative_bonus: int = Field(default=0, ge=-20, le=30)
+    concentration: bool = False
+    reaction_available: bool = True
+    legendary_actions: int = Field(default=0, ge=0, le=10)
+    legendary_actions_max: int = Field(default=0, ge=0, le=10)
+    notes: str = ""
+    conditions: list[str] = Field(default_factory=list)
+    actions: list[dict] = Field(default_factory=list)
+    source_id: str | None = None
+    reference_id: str | None = None
+
+
+class CombatantCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    kind: Literal["player", "enemy", "ally", "neutral"] = "enemy"
+    initiative: int = Field(default=10, ge=-10, le=50)
+    armor_class: int = Field(default=10, ge=0, le=40)
+    max_hp: int = Field(default=1, ge=1, le=10000)
+    current_hp: int | None = Field(default=None, ge=0, le=10000)
+    temp_hp: int = Field(default=0, ge=0, le=10000)
+    initiative_bonus: int = Field(default=0, ge=-20, le=30)
+    concentration: bool = False
+    reaction_available: bool = True
+    legendary_actions: int = Field(default=0, ge=0, le=10)
+    legendary_actions_max: int = Field(default=0, ge=0, le=10)
+    notes: str = Field(default="", max_length=3000)
+    conditions: list[str] = Field(default_factory=list, max_length=20)
+    actions: list[dict] = Field(default_factory=list, max_length=30)
+    source_id: str | None = None
+    reference_id: str | None = None
+
+
+class CombatantUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    kind: Literal["player", "enemy", "ally", "neutral"] | None = None
+    initiative: int | None = Field(default=None, ge=-10, le=50)
+    armor_class: int | None = Field(default=None, ge=0, le=40)
+    max_hp: int | None = Field(default=None, ge=1, le=10000)
+    current_hp: int | None = Field(default=None, ge=0, le=10000)
+    temp_hp: int | None = Field(default=None, ge=0, le=10000)
+    initiative_bonus: int | None = Field(default=None, ge=-20, le=30)
+    concentration: bool | None = None
+    reaction_available: bool | None = None
+    legendary_actions: int | None = Field(default=None, ge=0, le=10)
+    legendary_actions_max: int | None = Field(default=None, ge=0, le=10)
+    notes: str | None = Field(default=None, max_length=3000)
+    conditions: list[str] | None = Field(default=None, max_length=20)
+    actions: list[dict] | None = Field(default=None, max_length=30)
+
+
+class ReferenceCombatantCreate(BaseModel):
+    reference_id: str = Field(min_length=3, max_length=300)
+    initiative: int = Field(default=10, ge=-10, le=50)
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    quantity: int = Field(default=1, ge=1, le=20)
+
+
+class CombatantDuplicate(BaseModel):
+    quantity: int = Field(default=1, ge=1, le=20)
+
+
+class CombatRollRequest(BaseModel):
+    notation: str = Field(default="1d20", min_length=3, max_length=30)
+    label: str = Field(default="Tirada", min_length=2, max_length=160)
+    combatant_id: str | None = None
+
+
+class InitiativeRequest(BaseModel):
+    automatic: bool = True
+    rolls: dict[str, int] = Field(default_factory=dict)
+
+
+class Combat(BaseModel):
+    id: str
+    campaign_id: str
+    name: str
+    status: Literal["active", "completed"] = "active"
+    round: int = Field(default=1, ge=1)
+    turn_index: int = Field(default=0, ge=0)
+    encounter_id: str | None = None
+    summary: str = ""
+    created_at: str = Field(default_factory=utc_now)
+    combatants: list[Combatant] = Field(default_factory=list)
+
+
+class CombatCreate(BaseModel):
+    campaign_id: str = "demo"
+    name: str = Field(min_length=2, max_length=160)
+    encounter_id: str | None = None
+
+
+class CombatUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    status: Literal["active", "completed"] | None = None
+    summary: str | None = Field(default=None, max_length=10000)
+
+
+class CombatLog(BaseModel):
+    id: str
+    combat_id: str
+    message: str
+    kind: Literal["system", "damage", "healing", "roll", "condition", "turn"] = "system"
+    created_at: str = Field(default_factory=utc_now)
+
+
 class Memory(BaseModel):
     id: str
     npc_id: str
@@ -425,4 +718,11 @@ class CampaignBundle(CampaignImport):
     generation_entries: list[GenerationEntry] = Field(default_factory=list)
     encounters: list[Encounter] = Field(default_factory=list)
     rewards: list[Reward] = Field(default_factory=list)
+    lore_entries: list[LoreEntry] = Field(default_factory=list)
+    hex_cells: list[HexCell] = Field(default_factory=list)
+    combats: list[Combat] = Field(default_factory=list)
+    hexcrawl_settings: HexcrawlSettings | None = None
+    expedition_state: ExpeditionState | None = None
+    travel_logs: list[TravelLog] = Field(default_factory=list)
+    player_view_settings: PlayerViewSettings | None = None
     excluded_content_notice: str = "Els fitxers de la biblioteca documental no s'inclouen en l'exportació."

@@ -117,6 +117,67 @@ CREATE TABLE IF NOT EXISTS rewards (
     items TEXT NOT NULL, narrative_rewards TEXT NOT NULL, context_reasons TEXT NOT NULL,
     created_at TEXT NOT NULL, FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
+CREATE TABLE IF NOT EXISTS lore_entries (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, layer TEXT NOT NULL,
+    category TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL,
+    source_id TEXT, location_id TEXT, created_at TEXT NOT NULL,
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS hex_cells (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, q INTEGER NOT NULL, r INTEGER NOT NULL,
+    terrain TEXT NOT NULL, title TEXT NOT NULL, discovery TEXT NOT NULL,
+    travel_cost INTEGER NOT NULL, encounter_chance INTEGER NOT NULL,
+    player_notes TEXT NOT NULL, dm_notes TEXT NOT NULL, location_id TEXT, source_id TEXT,
+    UNIQUE(campaign_id, q, r), FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS combats (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL,
+    round INTEGER NOT NULL, turn_index INTEGER NOT NULL, encounter_id TEXT, summary TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS combatants (
+    id TEXT PRIMARY KEY, combat_id TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL,
+    initiative INTEGER NOT NULL, armor_class INTEGER NOT NULL, max_hp INTEGER NOT NULL,
+    current_hp INTEGER NOT NULL, temp_hp INTEGER NOT NULL DEFAULT 0, initiative_bonus INTEGER NOT NULL DEFAULT 0,
+    concentration INTEGER NOT NULL DEFAULT 0, reaction_available INTEGER NOT NULL DEFAULT 1,
+    legendary_actions INTEGER NOT NULL DEFAULT 0, legendary_actions_max INTEGER NOT NULL DEFAULT 0,
+    notes TEXT NOT NULL DEFAULT '', conditions TEXT NOT NULL, actions TEXT NOT NULL,
+    source_id TEXT, reference_id TEXT, FOREIGN KEY(combat_id) REFERENCES combats(id)
+);
+CREATE TABLE IF NOT EXISTS hexcrawl_settings (
+    campaign_id TEXT PRIMARY KEY, track_weather INTEGER NOT NULL DEFAULT 1,
+    track_navigation INTEGER NOT NULL DEFAULT 1, track_food INTEGER NOT NULL DEFAULT 1,
+    track_water INTEGER NOT NULL DEFAULT 1, track_fatigue INTEGER NOT NULL DEFAULT 1,
+    track_encounters INTEGER NOT NULL DEFAULT 1, track_foraging INTEGER NOT NULL DEFAULT 1,
+    auto_discover INTEGER NOT NULL DEFAULT 1, default_pace TEXT NOT NULL DEFAULT 'normal',
+    hex_distance REAL NOT NULL DEFAULT 10, distance_unit TEXT NOT NULL DEFAULT 'km',
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS expedition_state (
+    campaign_id TEXT PRIMARY KEY, current_hex_id TEXT, food REAL NOT NULL DEFAULT 40,
+    water REAL NOT NULL DEFAULT 80, supplies REAL NOT NULL DEFAULT 10,
+    exhaustion INTEGER NOT NULL DEFAULT 0, lost INTEGER NOT NULL DEFAULT 0,
+    weather TEXT NOT NULL DEFAULT 'clear', updated_at TEXT NOT NULL,
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS travel_logs (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, origin_hex_id TEXT, destination_hex_id TEXT NOT NULL,
+    route TEXT NOT NULL, pace TEXT NOT NULL, days INTEGER NOT NULL, distance REAL NOT NULL, distance_unit TEXT NOT NULL DEFAULT 'km',
+    weather TEXT NOT NULL, navigation_roll INTEGER, encounter_roll INTEGER,
+    food_used REAL NOT NULL, water_used REAL NOT NULL, exhaustion_delta INTEGER NOT NULL,
+    encounter_triggered INTEGER NOT NULL, encounter_id TEXT, reached_destination INTEGER NOT NULL,
+    notes TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS player_view_settings (
+    campaign_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, show_map INTEGER NOT NULL DEFAULT 1,
+    show_rumors INTEGER NOT NULL DEFAULT 1, show_resources INTEGER NOT NULL DEFAULT 1,
+    show_weather INTEGER NOT NULL DEFAULT 1, show_combat INTEGER NOT NULL DEFAULT 1,
+    show_enemy_hp INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS combat_logs (
+    id TEXT PRIMARY KEY, combat_id TEXT NOT NULL, message TEXT NOT NULL, kind TEXT NOT NULL,
+    created_at TEXT NOT NULL, FOREIGN KEY(combat_id) REFERENCES combats(id)
+);
 """
 
 
@@ -142,6 +203,26 @@ class Database:
             campaign_columns = {row["name"] for row in connection.execute("PRAGMA table_info(campaigns)")}
             if "archived" not in campaign_columns:
                 connection.execute("ALTER TABLE campaigns ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+            combat_columns = {row["name"] for row in connection.execute("PRAGMA table_info(combats)")}
+            if "encounter_id" not in combat_columns:
+                connection.execute("ALTER TABLE combats ADD COLUMN encounter_id TEXT")
+            if "summary" not in combat_columns:
+                connection.execute("ALTER TABLE combats ADD COLUMN summary TEXT NOT NULL DEFAULT ''")
+            combatant_columns = {row["name"] for row in connection.execute("PRAGMA table_info(combatants)")}
+            combatant_migrations = {
+                "temp_hp": "INTEGER NOT NULL DEFAULT 0", "initiative_bonus": "INTEGER NOT NULL DEFAULT 0",
+                "concentration": "INTEGER NOT NULL DEFAULT 0", "reaction_available": "INTEGER NOT NULL DEFAULT 1",
+                "legendary_actions": "INTEGER NOT NULL DEFAULT 0", "legendary_actions_max": "INTEGER NOT NULL DEFAULT 0",
+                "notes": "TEXT NOT NULL DEFAULT ''",
+            }
+            for name, definition in combatant_migrations.items():
+                if name not in combatant_columns:
+                    connection.execute(f"ALTER TABLE combatants ADD COLUMN {name} {definition}")
+            travel_columns = {row["name"] for row in connection.execute("PRAGMA table_info(travel_logs)")}
+            if "encounter_id" not in travel_columns:
+                connection.execute("ALTER TABLE travel_logs ADD COLUMN encounter_id TEXT")
+            if "distance_unit" not in travel_columns:
+                connection.execute("ALTER TABLE travel_logs ADD COLUMN distance_unit TEXT NOT NULL DEFAULT 'km'")
             connection.execute("""CREATE TABLE IF NOT EXISTS party_settings (
                 campaign_id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT 'Grup d''aventurers',
                 level INTEGER NOT NULL DEFAULT 3, size INTEGER NOT NULL DEFAULT 4,
@@ -149,8 +230,13 @@ class Database:
             )""")
             connection.execute("""INSERT OR IGNORE INTO party_settings(campaign_id)
                                   SELECT id FROM campaigns""")
+            connection.execute("""INSERT OR IGNORE INTO hexcrawl_settings(campaign_id)
+                                  SELECT id FROM campaigns""")
+            connection.execute("""INSERT OR IGNORE INTO player_view_settings(campaign_id)
+                                  SELECT id FROM campaigns""")
             self._seed(connection)
             self._seed_generation(connection)
+            self._seed_campaign_tools(connection)
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
@@ -221,3 +307,39 @@ class Database:
         for table_id, entries in (("table_encounter_demo", encounter_entries), ("table_reward_demo", reward_entries)):
             for entry_id, terrains, min_level, max_level, min_diff, max_diff, weight, title, payload, tags in entries:
                 db.execute("INSERT INTO generation_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (entry_id, table_id, json.dumps(terrains), min_level, max_level, min_diff, max_diff, weight, title, json.dumps(payload), json.dumps(tags)))
+
+    def _seed_campaign_tools(self, db: sqlite3.Connection) -> None:
+        if not db.execute("SELECT 1 FROM campaigns WHERE id='demo'").fetchone():
+            return
+        if not db.execute("SELECT 1 FROM lore_entries WHERE campaign_id='demo' LIMIT 1").fetchone():
+            lore = [
+                ("lore_dm_demo", "dm", "quest", "El sabotatge de l'expedició", "Nyra sospita que algú del gremi ven les rutes segures a una facció rival."),
+                ("lore_players_demo", "players", "lore", "Rumors del port", "Diversos mariners afirmen que la selva canvia els camins després de les tempestes."),
+                ("lore_world_demo", "world", "location", "Estació de pluges", "Les pluges han crescut els rius i han alentit totes les expedicions cap a l'interior."),
+            ]
+            for item_id, layer, category, title, content in lore:
+                db.execute("INSERT INTO lore_entries VALUES (?, 'demo', ?, ?, ?, ?, NULL, 'port_verd', datetime('now'))", (item_id, layer, category, title, content))
+        if not db.execute("SELECT 1 FROM hex_cells WHERE campaign_id='demo' LIMIT 1").fetchone():
+            hexes = [
+                ("hex_demo_0_0", 0, 0, "urban", "Port Verd", "explored", 1, 5, "Punt de sortida i lloc segur.", "Els contactes del gremi poden proporcionar guies.", "port_verd"),
+                ("hex_demo_1_0", 1, 0, "jungle", "Sender de les falgueres", "discovered", 2, 25, "Un sender parcialment cartografiat.", "Hi ha rastres recents de depredadors.", None),
+                ("hex_demo_0_1", 0, 1, "river", "Gual de pedra", "discovered", 2, 20, "Un pas possible si el riu no creix.", "Les pluges poden duplicar el cost de viatge.", None),
+                ("hex_demo_1_1", 1, 1, "ruins", "Ruïnes cobertes", "hidden", 3, 40, "", "Una cambra inferior conserva una inscripció i una reserva oblidada.", None),
+                ("hex_demo_-1_1", -1, 1, "swamp", "Aiguamolls silenciosos", "hidden", 3, 35, "", "Boira densa i terreny difícil; possible refugi d'una criatura territorial.", None),
+            ]
+            for row in hexes:
+                db.execute("INSERT INTO hex_cells VALUES (?, 'demo', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)", row)
+        if not db.execute("SELECT 1 FROM combats WHERE campaign_id='demo' LIMIT 1").fetchone():
+            db.execute("""INSERT INTO combats(id,campaign_id,name,status,round,turn_index,encounter_id,summary,created_at)
+                          VALUES ('combat_demo', 'demo', 'Emboscada al sender', 'active', 1, 0, NULL, '', datetime('now'))""")
+            combatants = [
+                ("combatant_demo_kara", "Kara", "ally", 16, 14, 24, 24, [], [{"name":"Ballesta lleugera","description":"Atac a distància; 1d8+2 perforant.","source":"manual"}], None, None),
+                ("combatant_demo_goblin", "Explorador goblin", "enemy", 14, 15, 12, 12, [], [{"name":"Cimitarra","description":"Atac cos a cos; 1d6+2 tallant.","source":"SRD"},{"name":"Amagar-se","description":"Intenta ocultar-se com a acció addicional.","source":"SRD"}], None, "srd51:monsters:goblin"),
+                ("combatant_demo_raptor", "Raptor de la jungla", "enemy", 11, 13, 18, 18, [], [{"name":"Mossegada","description":"Atac cos a cos; dany perforant.","source":"manual"}], None, None),
+            ]
+            for item_id, name, kind, initiative, armor_class, max_hp, current_hp, conditions, actions, source_id, reference_id in combatants:
+                db.execute("""INSERT INTO combatants(id,combat_id,name,kind,initiative,armor_class,max_hp,current_hp,
+                           conditions,actions,source_id,reference_id) VALUES (?, 'combat_demo', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           (item_id, name, kind, initiative, armor_class, max_hp, current_hp, json.dumps(conditions), json.dumps(actions), source_id, reference_id))
+        db.execute("""INSERT OR IGNORE INTO expedition_state(campaign_id,current_hex_id,food,water,supplies,exhaustion,lost,weather,updated_at)
+                      VALUES ('demo','hex_demo_0_0',40,80,10,0,0,'clear',datetime('now'))""")

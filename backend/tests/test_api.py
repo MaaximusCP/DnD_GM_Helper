@@ -104,6 +104,115 @@ class APITests(unittest.TestCase):
         self.assertEqual(reward.status_code, 201)
         self.assertEqual(reward.json()["terrain"], "jungle")
 
+    def test_knowledge_layers_hexcrawl_and_combat_assistant(self):
+        dashboard = self.client.get("/api/campaigns/demo").json()
+        self.assertEqual({item["layer"] for item in dashboard["lore_entries"]}, {"dm", "players", "world"})
+        self.assertGreaterEqual(len(dashboard["hex_cells"]), 5)
+        self.assertEqual(dashboard["combats"][0]["combatants"][0]["initiative"], 16)
+
+        lore = self.client.post("/api/lore", json={
+            "campaign_id": "demo", "layer": "players", "category": "location",
+            "title": "Gual descobert", "content": "El grup ja coneix un pas segur pel riu.",
+        })
+        self.assertEqual(lore.status_code, 201)
+        self.assertEqual(self.client.get("/api/lore", params={"campaign_id":"demo", "layer":"players"}).status_code, 200)
+
+        hex_cell = self.client.post("/api/hexes", json={
+            "campaign_id":"demo", "q":3, "r":2, "terrain":"jungle", "title":"Dosser espès",
+            "discovery":"hidden", "travel_cost":3, "encounter_chance":35,
+            "player_notes":"", "dm_notes":"Petjades al nord",
+        })
+        self.assertEqual(hex_cell.status_code, 201)
+        revealed = self.client.patch(f"/api/hexes/{hex_cell.json()['id']}", json={"discovery":"discovered"})
+        self.assertEqual(revealed.json()["discovery"], "discovered")
+        self.assertEqual(self.client.post("/api/hexes", json={
+            "campaign_id":"demo", "q":3, "r":2, "title":"Duplicat",
+        }).status_code, 409)
+
+        combat = self.client.post("/api/combats", json={"campaign_id":"demo", "name":"Prova de combat"})
+        combat_id = combat.json()["id"]
+        combatant = self.client.post(f"/api/combats/{combat_id}/combatants", json={
+            "name":"Guerrer de prova", "kind":"enemy", "initiative":17,
+            "armor_class":14, "max_hp":20, "actions":[{"name":"Llança", "description":"1d6"}],
+        })
+        self.assertEqual(combatant.json()["current_hp"], 20)
+        reference_combatant = self.client.post(f"/api/combats/{combat_id}/combatants/from-reference", json={
+            "reference_id":"srd51:monsters:goblin", "initiative":12,
+        })
+        self.assertEqual(reference_combatant.status_code, 201)
+        self.assertEqual(reference_combatant.json()["reference_id"], "srd51:monsters:goblin")
+        self.assertTrue(reference_combatant.json()["actions"])
+        damaged = self.client.patch(f"/api/combatants/{combatant.json()['id']}", json={"current_hp":7, "conditions":["enverinat"]})
+        self.assertEqual(damaged.json()["current_hp"], 7)
+        next_turn = self.client.post(f"/api/combats/{combat_id}/next-turn").json()
+        self.assertEqual(next_turn["turn_index"], 1)
+        self.assertEqual(self.client.post(f"/api/combats/{combat_id}/next-turn").json()["round"], 2)
+        exported = self.client.get("/api/campaigns/demo/export").json()
+        self.assertIn("lore_entries", exported)
+        self.assertIn("hex_cells", exported)
+        self.assertIn("combats", exported)
+
+    def test_modular_travel_player_projection_and_advanced_combat(self):
+        dashboard = self.client.get("/api/campaigns/demo").json()
+        self.assertTrue(dashboard["hexcrawl_settings"]["track_water"])
+        self.assertEqual(dashboard["expedition_state"]["current_hex_id"], "hex_demo_0_0")
+
+        disabled = self.client.patch("/api/campaigns/demo/hexcrawl-settings", json={
+            "track_weather":False, "track_navigation":False, "track_food":False,
+            "track_water":False, "track_fatigue":False, "track_encounters":False,
+            "track_foraging":False,
+        })
+        self.assertEqual(disabled.status_code, 200)
+        travel = self.client.post("/api/campaigns/demo/travel", json={
+            "destination_hex_id":"hex_demo_1_0", "pace":"fast",
+        })
+        self.assertEqual(travel.status_code, 201)
+        self.assertEqual(travel.json()["food_used"], 0)
+        self.assertEqual(travel.json()["weather"], "ignored")
+        self.assertTrue(travel.json()["reached_destination"])
+
+        enabled = self.client.patch("/api/campaigns/demo/hexcrawl-settings", json={
+            "track_weather":True, "track_navigation":True, "track_food":True,
+            "track_water":True, "track_fatigue":True, "track_encounters":True,
+            "track_foraging":True,
+        })
+        self.assertEqual(enabled.status_code, 200)
+        encounter_travel = self.client.post("/api/campaigns/demo/travel", json={
+            "destination_hex_id":"hex_demo_1_1", "pace":"normal", "navigation_roll":20,
+            "encounter_roll":1, "foraging_roll":20, "manual_weather":"clear",
+        })
+        self.assertEqual(encounter_travel.status_code, 201)
+        self.assertTrue(encounter_travel.json()["encounter_triggered"])
+        self.assertIsNotNone(encounter_travel.json()["encounter_id"])
+
+        player = self.client.get("/api/player-view/demo")
+        self.assertEqual(player.status_code, 200)
+        serialized = player.text
+        self.assertNotIn("sabotatge", serialized.lower())
+        self.assertNotIn("dm_notes", serialized)
+        self.assertNotIn("petjades recents", serialized.lower())
+        self.assertTrue(all(item["discovery"] != "hidden" for item in player.json()["hexes"]))
+        self.assertEqual(self.client.patch("/api/campaigns/demo/player-view-settings", json={"enabled":False}).status_code, 200)
+        self.assertEqual(self.client.get("/api/player-view/demo").status_code, 403)
+
+        combat_id = "combat_demo"
+        combatant_id = "combatant_demo_goblin"
+        advanced = self.client.patch(f"/api/combatants/{combatant_id}", json={
+            "temp_hp":5, "concentration":True, "reaction_available":False,
+            "legendary_actions":1, "legendary_actions_max":2, "conditions":["enverinat"],
+        })
+        self.assertEqual(advanced.status_code, 200)
+        self.assertEqual(advanced.json()["temp_hp"], 5)
+        self.assertTrue(advanced.json()["concentration"])
+        duplicated = self.client.post(f"/api/combatants/{combatant_id}/duplicate", json={"quantity":2})
+        self.assertEqual(len(duplicated.json()), 2)
+        initiative = self.client.post(f"/api/combats/{combat_id}/initiative", json={"automatic":True})
+        self.assertEqual(initiative.status_code, 200)
+        rolled = self.client.post(f"/api/combats/{combat_id}/roll", json={"notation":"2d6+3", "label":"Dany"})
+        self.assertEqual(rolled.status_code, 200)
+        self.assertGreaterEqual(rolled.json()["total"], 5)
+        self.assertTrue(self.client.get(f"/api/combats/{combat_id}/log").json())
+
     def test_campaign_studio_world_party_and_custom_tables(self):
         created = self.client.post("/api/campaigns", json={
             "name": "Campanya pròpia", "system": "dnd5e",
