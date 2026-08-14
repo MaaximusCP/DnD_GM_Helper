@@ -66,6 +66,14 @@ class OperationsRepository:
             self.add_activity(CampaignActivityCreate(campaign_id=row["campaign_id"], kind="delete", title=f"Eliminat: {row['title']}"))
         return bool(row)
 
+    def duplicate_record(self, item_id: str) -> CampaignRecord | None:
+        item = self.get_record(item_id)
+        if not item:
+            return None
+        return self.create_record(CampaignRecordCreate(campaign_id=item.campaign_id, kind=item.kind,
+            title=f"Còpia de {item.title}", status=item.status, visibility=item.visibility,
+            due_day=item.due_day, linked_id=item.linked_id, data=dict(item.data)))
+
     def add_activity(self, payload: CampaignActivityCreate) -> CampaignActivity:
         item = CampaignActivity(id=f"activity_{uuid4().hex[:12]}", **payload.model_dump())
         with self.database.connect() as db:

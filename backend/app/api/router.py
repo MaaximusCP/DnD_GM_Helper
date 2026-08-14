@@ -291,6 +291,14 @@ def delete_campaign_record(item_id: str, confirm: bool = False,
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post("/campaign-records/{item_id}/duplicate", status_code=status.HTTP_201_CREATED)
+def duplicate_campaign_record(item_id: str, repository: OperationsRepository = Depends(get_operations_repository)):
+    item = repository.duplicate_record(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Element no trobat")
+    return item
+
+
 @router.get("/campaigns/{campaign_id}/activities")
 def list_campaign_activities(campaign_id: str, repository: OperationsRepository = Depends(get_operations_repository)):
     return repository.list_activities(campaign_id)

@@ -404,6 +404,9 @@ class APITests(unittest.TestCase):
         })
         self.assertEqual(quest.status_code, 201)
         self.assertEqual(clock.status_code, 201)
+        duplicated = self.client.post(f"/api/campaign-records/{quest.json()['id']}/duplicate")
+        self.assertEqual(duplicated.status_code, 201)
+        self.assertTrue(duplicated.json()["title"].startswith("Còpia de"))
         self.client.patch("/api/hexes/hex_demo_1_0", json={
             "risk_level": 4, "alert_level": 2, "risk_tags": ["malaltia", "patrulles"],
         })

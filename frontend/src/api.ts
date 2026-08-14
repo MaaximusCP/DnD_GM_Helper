@@ -114,6 +114,7 @@ export const api = {
   createRecord: (campaignId:string,payload:Record<string,unknown>) => request<CampaignRecord>('/campaign-records',{method:'POST',body:JSON.stringify({campaign_id:campaignId,...payload})}),
   updateRecord: (id:string,payload:Partial<CampaignRecord>) => request<CampaignRecord>(`/campaign-records/${id}`,{method:'PATCH',body:JSON.stringify(payload)}),
   deleteRecord: (id:string) => request<void>(`/campaign-records/${id}?confirm=true`,{method:'DELETE'}),
+  duplicateRecord: (id:string) => request<CampaignRecord>(`/campaign-records/${id}/duplicate`,{method:'POST'}),
   addActivity: (campaignId:string,payload:Record<string,unknown>) => request<CampaignActivity>(`/campaigns/${campaignId}/activities`,{method:'POST',body:JSON.stringify({campaign_id:campaignId,...payload})}),
   closeSession: (id:string,summary='',shareSummary=true) => request<{session:Session;summary:string;activities:CampaignActivity[]}>(`/sessions/${id}/close`,{method:'POST',body:JSON.stringify({summary,share_summary:shareSummary})}),
   resolveEncounter: (id:string,payload:Record<string,unknown>) => request<Record<string,unknown>>(`/encounters/${id}/resolve`,{method:'POST',body:JSON.stringify(payload)}),

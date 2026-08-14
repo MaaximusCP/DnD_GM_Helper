@@ -86,6 +86,7 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `POST` | `/combats/{id}/characters` | Afegeix personatges al combat amb PG i condicions sincronitzats |
 | `GET/POST` | `/campaign-records` | Llista o crea missions, calendari, clocks, escenes, mapes, marcadors i vincles |
 | `PATCH/DELETE` | `/campaign-records/{id}` | Actualitza estat, visibilitat i dades d'un element d'operacions |
+| `POST` | `/campaign-records/{id}/duplicate` | Duplica missions, escenes, clocks, mapes o altres plantilles |
 | `GET/POST` | `/campaigns/{id}/activities` | Cronologia automàtica i notes de sessió |
 | `POST` | `/sessions/{id}/close` | Tanca la sessió i genera un resum a partir de l'activitat |
 | `POST` | `/encounters/{id}/resolve` | Resol l'encounter i aplica XP, missió, clock i recompensa |
