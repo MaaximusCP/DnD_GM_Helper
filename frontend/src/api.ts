@@ -3,7 +3,7 @@ import type {
   GenerationTable, Knowledge, Location, NPC, NPCCreate, PartySettings, Reward, SearchResult, Session,
   ReferenceItem, ReferenceSearch,
   Combat, Combatant, CombatLog, ExpeditionState, HexCell, HexcrawlSettings, LoreEntry, LoreLayer,
-  PlayerView, PlayerViewSettings, TravelLog,
+  ExpeditionRestResult, PlayerView, PlayerViewSettings, TravelLog,
 } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000/api' : '/api')
@@ -74,14 +74,18 @@ export const api = {
   deleteLore: (id:string) => request<void>(`/lore/${id}?confirm=true`,{method:'DELETE'}),
   createHex: (campaignId:string,payload:Omit<HexCell,'id'|'campaign_id'>) => request<HexCell>('/hexes',{method:'POST',body:JSON.stringify({campaign_id:campaignId,...payload})}),
   updateHex: (id:string,payload:Partial<HexCell>) => request<HexCell>(`/hexes/${id}`,{method:'PATCH',body:JSON.stringify(payload)}),
+  deleteHex: (id:string) => request<void>(`/hexes/${id}?confirm=true`,{method:'DELETE'}),
+  revealHexes: (campaignId:string,centerHexId:string,radius:number,discovery:'discovered'|'explored') => request<HexCell[]>(`/campaigns/${campaignId}/hexes/reveal`,{method:'POST',body:JSON.stringify({center_hex_id:centerHexId,radius,discovery})}),
   hexcrawlSettings: (campaignId:string) => request<HexcrawlSettings>(`/campaigns/${campaignId}/hexcrawl-settings`),
   updateHexcrawlSettings: (campaignId:string,payload:Partial<HexcrawlSettings>) => request<HexcrawlSettings>(`/campaigns/${campaignId}/hexcrawl-settings`,{method:'PATCH',body:JSON.stringify(payload)}),
   expedition: (campaignId:string) => request<{state:ExpeditionState;logs:TravelLog[]}>(`/campaigns/${campaignId}/expedition`),
   updateExpedition: (campaignId:string,payload:Partial<ExpeditionState>) => request<ExpeditionState>(`/campaigns/${campaignId}/expedition`,{method:'PATCH',body:JSON.stringify(payload)}),
   travel: (campaignId:string,payload:{destination_hex_id:string;pace?:string;navigation_roll?:number;encounter_roll?:number;foraging_roll?:number;manual_weather?:string}) => request<TravelLog>(`/campaigns/${campaignId}/travel`,{method:'POST',body:JSON.stringify(payload)}),
+  rest: (campaignId:string,payload:{rest_type:'short'|'long';consume_resources:boolean;safe_camp:boolean}) => request<ExpeditionRestResult>(`/campaigns/${campaignId}/rest`,{method:'POST',body:JSON.stringify(payload)}),
   playerView: (campaignId:string) => request<PlayerView>(`/player-view/${campaignId}`),
   updatePlayerViewSettings: (campaignId:string,payload:Partial<PlayerViewSettings>) => request<PlayerViewSettings>(`/campaigns/${campaignId}/player-view-settings`,{method:'PATCH',body:JSON.stringify(payload)}),
   createCombat: (campaignId:string,name:string,encounterId?:string) => request<Combat>('/combats',{method:'POST',body:JSON.stringify({campaign_id:campaignId,name,encounter_id:encounterId||null})}),
+  encounterToCombat: (encounterId:string,quantity=1,referenceId?:string) => request<Combat>(`/encounters/${encounterId}/combat`,{method:'POST',body:JSON.stringify({quantity,reference_id:referenceId||null,roll_initiative:true})}),
   updateCombat: (id:string,payload:Partial<Combat>) => request<Combat>(`/combats/${id}`,{method:'PATCH',body:JSON.stringify(payload)}),
   nextTurn: (id:string) => request<Combat>(`/combats/${id}/next-turn`,{method:'POST'}),
   addCombatant: (combatId:string,payload:Record<string,unknown>) => request<Combatant>(`/combats/${combatId}/combatants`,{method:'POST',body:JSON.stringify(payload)}),

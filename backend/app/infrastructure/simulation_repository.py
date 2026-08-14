@@ -180,6 +180,13 @@ class SimulationRepository:
             row = db.execute("SELECT * FROM encounters WHERE id=?", (encounter_id,)).fetchone()
             return Encounter(**{**dict(row), "objectives": json.loads(row["objectives"]), "complications": json.loads(row["complications"]), "context_reasons": json.loads(row["context_reasons"])}) if row else None
 
+    def update_encounter_status(self, encounter_id: str, status: str) -> Encounter | None:
+        with self.database.connect() as db:
+            if not db.execute("SELECT 1 FROM encounters WHERE id=?", (encounter_id,)).fetchone():
+                return None
+            db.execute("UPDATE encounters SET status=? WHERE id=?", (status, encounter_id))
+        return self.get_encounter(encounter_id)
+
     def save_reward(self, item: Reward) -> Reward:
         with self.database.connect() as db:
             db.execute("INSERT INTO rewards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (

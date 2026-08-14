@@ -35,7 +35,11 @@ Aquest repositori implementa la **vertical slice 0.1** definida a [`projecte_gm_
 - pantalla de jugadors en una URL independent que mai carrega secrets del DM;
 - hexcrawl modular amb clima, navegació, menjar, aigua, fatiga, foratge i encounters activables individualment;
 - dies de viatge amb ruta, ritme, tirades manuals o automàtiques, consum, descobriment i diari;
+- revelat radial, edició segura d'hexàgons i eines avançades plegables;
+- descansos curts i llargs amb campament, provisions, esgotament i avanç del calendari;
 - combat avançat amb PG temporals, concentració, reaccions, accions llegendàries, tirades i historial;
+- conversió d'un encounter en combat SRD preparat i resolució sincronitzada;
+- menú de configuració local per mostrar o ocultar mòduls i adaptar densitat, context i accessibilitat;
 - API REST documentada automàticament amb OpenAPI.
 
 > El projecte no distribueix text, mapes, personatges ni altres continguts de cap aventura comercial. Pots importar-hi el contingut que tinguis dret a utilitzar.
@@ -170,7 +174,9 @@ La base de dades és la font de veritat. El LLM rep només el context rellevant 
 
 ## Abast actual i roadmap
 
-La versió 0.4 incorpora Campaign Studio, edició visual del món i les taules, i un catàleg SRD local integrat amb els generadors. Queden per a fases posteriors l'OCR, embeddings semàntics, mapes interactius amb marcadors, simulació d'NPC entre sessions i regles D&D 5e més exhaustives.
+La versió 0.7 incorpora Campaign Studio, catàleg SRD local, pantalla de jugadors, hexcrawl modular, descansos persistents i el flux encounter → combat. Queden per a fases posteriors l'OCR, embeddings semàntics, mapes d'imatge amb marcadors, simulació d'NPC entre sessions i regles D&D 5e més exhaustives.
+
+El botó de controls de la capçalera obre les [preferències de la interfície](docs/ui-settings.md). Es pot simplificar el menú per sessió sense eliminar dades ni afectar altres navegadors.
 
 ## Publicació a GitHub
 

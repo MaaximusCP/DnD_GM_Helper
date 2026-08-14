@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from app.domain.models import (
     Combat, CombatCreate, CombatLog, CombatUpdate, Combatant, CombatantCreate, CombatantUpdate,
-    ExpeditionState, ExpeditionStateUpdate, HexCell, HexCellCreate, HexCellUpdate,
+    ExpeditionState, ExpeditionStateUpdate, HexCell, HexCellCreate, HexCellUpdate, HexRevealRequest,
     HexcrawlSettings, HexcrawlSettingsUpdate, LoreEntry, LoreEntryCreate, LoreEntryUpdate,
     PlayerViewSettings, PlayerViewSettingsUpdate, TravelLog, utc_now,
 )
@@ -81,6 +81,36 @@ class CampaignToolsRepository:
                 db.execute(f"UPDATE hex_cells SET {assignments} WHERE id=?", (*values.values(), item_id))
             row = db.execute("SELECT * FROM hex_cells WHERE id=?", (item_id,)).fetchone()
         return HexCell(**dict(row))
+
+    def reveal_hexes(self, campaign_id: str, payload: HexRevealRequest) -> list[HexCell]:
+        center = self.get_hex(payload.center_hex_id)
+        if not center or center.campaign_id != campaign_id:
+            raise ValueError("L'hex central no pertany a la campanya")
+        changed: list[HexCell] = []
+        for item in self.list_hexes(campaign_id):
+            dq, dr = item.q - center.q, item.r - center.r
+            distance = max(abs(dq), abs(dr), abs(dq + dr))
+            if distance > payload.radius:
+                continue
+            target = payload.discovery
+            if item.discovery == "explored" or (item.discovery == "discovered" and target == "discovered"):
+                changed.append(item)
+                continue
+            updated = self.update_hex(item.id, HexCellUpdate(discovery=target))
+            if updated:
+                changed.append(updated)
+        return changed
+
+    def delete_hex(self, item_id: str) -> bool:
+        item = self.get_hex(item_id)
+        if not item:
+            return False
+        state = self.get_expedition_state(item.campaign_id)
+        if state.current_hex_id == item_id:
+            raise ValueError("No es pot eliminar l'hex on es troba l'expedició")
+        with self.database.connect() as db:
+            db.execute("DELETE FROM hex_cells WHERE id=?", (item_id,))
+        return True
 
     def get_hexcrawl_settings(self, campaign_id: str) -> HexcrawlSettings:
         with self.database.connect() as db:

@@ -170,6 +170,12 @@ class HexCellUpdate(BaseModel):
     source_id: str | None = None
 
 
+class HexRevealRequest(BaseModel):
+    center_hex_id: str
+    radius: int = Field(default=1, ge=0, le=10)
+    discovery: Literal["discovered", "explored"] = "discovered"
+
+
 class HexcrawlSettings(BaseModel):
     campaign_id: str
     track_weather: bool = True
@@ -230,6 +236,12 @@ class TravelRequest(BaseModel):
     manual_weather: str | None = Field(default=None, max_length=80)
 
 
+class ExpeditionRestRequest(BaseModel):
+    rest_type: Literal["short", "long"] = "long"
+    consume_resources: bool = True
+    safe_camp: bool = True
+
+
 class TravelLog(BaseModel):
     id: str
     campaign_id: str
@@ -251,6 +263,17 @@ class TravelLog(BaseModel):
     reached_destination: bool = True
     notes: list[str] = Field(default_factory=list)
     created_at: str = Field(default_factory=utc_now)
+
+
+class ExpeditionRestResult(BaseModel):
+    state: ExpeditionState
+    log: TravelLog
+    food_used: float = 0
+    water_used: float = 0
+    supplies_used: float = 0
+    exhaustion_delta: int = 0
+    day_advanced: int = 0
+    notes: list[str] = Field(default_factory=list)
 
 
 class PlayerViewSettings(BaseModel):
@@ -373,6 +396,12 @@ class CombatCreate(BaseModel):
     campaign_id: str = "demo"
     name: str = Field(min_length=2, max_length=160)
     encounter_id: str | None = None
+
+
+class EncounterCombatRequest(BaseModel):
+    reference_id: str | None = Field(default=None, max_length=300)
+    quantity: int = Field(default=1, ge=1, le=20)
+    roll_initiative: bool = True
 
 
 class CombatUpdate(BaseModel):

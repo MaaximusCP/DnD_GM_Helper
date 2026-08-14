@@ -23,6 +23,10 @@ Cada campanya pot activar o desactivar independentment clima, navegació, menjar
 
 Desactivar un subsistema no elimina les seves dades: simplement deixa d'aplicar-ne tirades, consum i penalitzacions. Això permet passar de supervivència completa a exploració narrativa en qualsevol moment.
 
+L'editor permet revelar o marcar com explorada una zona completa mitjançant distància axial. L'hex de la posició actual no es pot eliminar. Les notes, les eines de zona i la creació d'hexàgons es presenten plegades per mantenir el mapa net durant la partida.
+
+Els descansos curts no avancen el calendari. Els descansos llargs poden consumir provisions segons la mida del grup, avançar un dia, reduir esgotament si el campament és segur o augmentar-lo si falten recursos. Tant el consum com la seguretat són decisions explícites del DM, i el resultat queda al mateix diari persistent de l'expedició.
+
 ## Pantalla dels jugadors
 
 `GET /player-view/{campaign_id}` construeix una projecció segura amb només lore `players`, hexàgons descoberts, notes públiques, rumors permesos, recursos configurats i combat sanititzat. Els PG enemics són opcionals i les accions enemigues no s'exposen. Si la pantalla està desactivada, l'endpoint retorna `403`.
@@ -45,6 +49,12 @@ La interfície permet aplicar dany o curació, avançar el torn, consultar accio
 L'API ja permet crear un combatent complet des d'un monstre del catàleg local mitjançant `POST /combats/{id}/combatants/from-reference`. Aquest primer adaptador carrega nom, CA, PG i accions; és el patró de referència per al futur adaptador documental.
 
 La UI permet cercar monstres SRD, afegir-ne múltiples còpies, duplicar combatents, tirar iniciativa, modificar l'ordre, aplicar condicions, gestionar concentració/reaccions, fer tirades amb notació de daus i conservar un historial del combat. Els combats poden quedar vinculats a l'encounter que els ha originat.
+
+`POST /encounters/{id}/combat` tanca el flux de preparació: valida que l'encounter sigui combatiu, selecciona un adversari compatible per nivell, dificultat i terreny, crea les còpies demanades i tira iniciativa. La cua d'encounters és plegable i evita duplicar combats. En finalitzar el combat, l'encounter vinculat passa automàticament a `resolved`; si es reobre, torna a quedar pendent.
+
+## Criteri d'interfície
+
+Les accions freqüents es mostren directament i la configuració secundària utilitza blocs desplegables. Aquest patró s'aplica a notes d'hex, eines de zona, creació, campament, detalls de resolució i cua d'encounters. Així es conserva context visual sense obligar el DM a desplaçar-se per formularis llargs.
 
 ## Flux futur des de documents
 

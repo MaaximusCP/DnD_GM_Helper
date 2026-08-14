@@ -1,4 +1,4 @@
-# API local 0.6
+# API local 0.7
 
 Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interactiva completa a `/docs`.
 
@@ -47,9 +47,12 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `PATCH/DELETE` | `/lore/{id}` | Edita, mou de capa o elimina una entrada de coneixement |
 | `GET/POST` | `/hexes` | Consulta o crea hexàgons de la campanya |
 | `PATCH` | `/hexes/{id}` | Actualitza descobriment, viatge, encounter i notes de l'hex |
+| `DELETE` | `/hexes/{id}?confirm=true` | Elimina un hex que no sigui la posició actual |
+| `POST` | `/campaigns/{id}/hexes/reveal` | Revela o explora una zona per radi axial |
 | `GET/PATCH` | `/campaigns/{id}/hexcrawl-settings` | Consulta o activa cada subsistema de l'hexcrawl |
 | `GET/PATCH` | `/campaigns/{id}/expedition` | Estat de recursos, posició, clima, esgotament i diari |
 | `POST` | `/campaigns/{id}/travel` | Resol una ruta amb ritme, regles actives i tirades opcionals |
+| `POST` | `/campaigns/{id}/rest` | Resol descans curt o llarg, provisions, campament i esgotament |
 | `GET/PATCH` | `/campaigns/{id}/player-view-settings` | Configura la informació compartida amb els jugadors |
 | `GET` | `/player-view/{id}` | Projecció filtrada sense dades secretes del DM |
 | `GET/POST` | `/combats` | Consulta o crea combats persistents |
@@ -68,6 +71,7 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `PUT/DELETE` | `/generation-entries/{id}` | Edita o elimina una opció custom |
 | `GET` | `/encounters` | Historial d'encounters generats |
 | `POST` | `/encounters/generate` | Genera i desa un encounter contextual |
+| `POST` | `/encounters/{id}/combat` | Prepara un combat amb adversaris SRD a partir de l'encounter |
 | `GET` | `/rewards` | Historial de recompenses |
 | `POST` | `/rewards/generate` | Genera i desa una recompensa contextual |
 | `GET` | `/reference/meta` | Versió, llicència i recompte del catàleg SRD local |

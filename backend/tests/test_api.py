@@ -269,6 +269,59 @@ class APITests(unittest.TestCase):
         self.assertEqual(self.client.delete(f"/api/generation-tables/{table_id}?confirm=true").status_code, 204)
         self.assertEqual(self.client.patch(f"/api/campaigns/{campaign_id}", json={"archived": True}).json()["archived"], True)
 
+    def test_hex_zone_rest_and_encounter_to_combat_flow(self):
+        revealed = self.client.post("/api/campaigns/demo/hexes/reveal", json={
+            "center_hex_id": "hex_demo_0_0", "radius": 1, "discovery": "explored",
+        })
+        self.assertEqual(revealed.status_code, 200)
+        self.assertGreaterEqual(len(revealed.json()), 3)
+        self.assertTrue(all(item["discovery"] == "explored" for item in revealed.json()))
+
+        self.assertEqual(self.client.delete("/api/hexes/hex_demo_0_0?confirm=true").status_code, 409)
+        disposable = self.client.post("/api/hexes", json={
+            "campaign_id": "demo", "q": 9, "r": 9, "title": "Hex temporal",
+        })
+        self.assertEqual(disposable.status_code, 201)
+        self.assertEqual(self.client.delete(f"/api/hexes/{disposable.json()['id']}?confirm=true").status_code, 204)
+
+        self.client.patch("/api/campaigns/demo/expedition", json={
+            "food": 20, "water": 40, "supplies": 5, "exhaustion": 2, "lost": True,
+        })
+        day_before = self.client.get("/api/campaigns/demo").json()["campaign"]["current_day"]
+        rested = self.client.post("/api/campaigns/demo/rest", json={
+            "rest_type": "long", "consume_resources": True, "safe_camp": True,
+        })
+        self.assertEqual(rested.status_code, 201)
+        self.assertEqual(rested.json()["state"]["food"], 16)
+        self.assertEqual(rested.json()["state"]["water"], 32)
+        self.assertEqual(rested.json()["state"]["supplies"], 4)
+        self.assertEqual(rested.json()["state"]["exhaustion"], 1)
+        self.assertFalse(rested.json()["state"]["lost"])
+        self.assertEqual(rested.json()["log"]["pace"], "rest_long")
+        self.assertEqual(self.client.get("/api/campaigns/demo").json()["campaign"]["current_day"], day_before + 1)
+
+        encounter = self.client.post("/api/encounters/generate", json={
+            "campaign_id": "demo", "terrain": "jungle", "party_level": 4,
+            "party_size": 4, "difficulty": 3, "encounter_type": "combat",
+        })
+        self.assertEqual(encounter.status_code, 201)
+        prepared = self.client.post(f"/api/encounters/{encounter.json()['id']}/combat", json={
+            "quantity": 2, "roll_initiative": True,
+        })
+        self.assertEqual(prepared.status_code, 201)
+        self.assertEqual(prepared.json()["encounter_id"], encounter.json()["id"])
+        self.assertEqual(len(prepared.json()["combatants"]), 2)
+        self.assertTrue(all(item["reference_id"] for item in prepared.json()["combatants"]))
+        self.assertEqual(self.client.post(f"/api/encounters/{encounter.json()['id']}/combat", json={}).status_code, 409)
+
+        completed = self.client.patch(f"/api/combats/{prepared.json()['id']}", json={
+            "status": "completed", "summary": "Victòria del grup",
+        })
+        self.assertEqual(completed.status_code, 200)
+        encounters = self.client.get("/api/encounters", params={"campaign_id": "demo"}).json()
+        resolved = next(item for item in encounters if item["id"] == encounter.json()["id"])
+        self.assertEqual(resolved["status"], "resolved")
+
     def test_local_srd_reference_catalog(self):
         metadata = self.client.get("/api/reference/meta")
         self.assertEqual(metadata.status_code, 200)

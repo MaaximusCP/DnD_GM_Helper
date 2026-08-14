@@ -10,6 +10,7 @@ from app.application.backup_service import BackupService
 from app.application.document_service import DocumentService
 from app.application.generation_service import GenerationService
 from app.application.rumor_service import RumorService
+from app.application.rest_service import RestService
 from app.application.travel_service import TravelService
 from app.config import Settings, get_settings
 from app.domain.models import (
@@ -24,7 +25,8 @@ from app.domain.models import (
     ReferenceCombatantCreate,
     HexCellCreate, HexCellUpdate, LoreEntryCreate, LoreEntryUpdate,
     CombatantDuplicate, CombatRollRequest, InitiativeRequest,
-    ExpeditionStateUpdate, HexcrawlSettingsUpdate, PlayerViewSettingsUpdate, TravelRequest,
+    EncounterCombatRequest, ExpeditionRestRequest, ExpeditionStateUpdate, HexcrawlSettingsUpdate,
+    HexRevealRequest, PlayerViewSettingsUpdate, TravelRequest,
 )
 from app.infrastructure.campaign_tools_repository import CampaignToolsRepository
 from app.infrastructure.content_repository import ContentRepository
@@ -52,6 +54,24 @@ def get_simulation_repository(settings: Settings = Depends(get_settings)) -> Sim
 
 def get_campaign_tools_repository(settings: Settings = Depends(get_settings)) -> CampaignToolsRepository:
     return CampaignToolsRepository(Database(settings.database_path))
+
+
+def _add_reference_combatants(repository: CampaignToolsRepository, combat_id: str,
+                              payload: ReferenceCombatantCreate):
+    reference = ReferenceCatalog().get(payload.reference_id)
+    if not reference or reference.get("category") != "monsters":
+        raise ValueError("Monstre no trobat al catàleg SRD")
+    data = reference.get("data", {})
+    raw_ac = data.get("armor_class", 10)
+    armor_class = raw_ac[0].get("value", 10) if isinstance(raw_ac, list) and raw_ac else raw_ac if isinstance(raw_ac, int) else 10
+    actions = [{"name": action.get("name", "Acció"), "description": action.get("desc", ""), "source": "SRD 5.1"}
+               for action in data.get("actions", [])[:20]]
+    return [repository.add_combatant(combat_id, CombatantCreate(
+        name=(payload.name or reference["name"]) + (f" {index + 1}" if payload.quantity > 1 else ""),
+        kind="enemy", initiative=payload.initiative - index,
+        armor_class=armor_class, max_hp=max(1, int(data.get("hit_points", 1))), actions=actions,
+        reference_id=payload.reference_id,
+    )) for index in range(payload.quantity)]
 
 
 @router.get("/health")
@@ -562,6 +582,28 @@ def update_hex(item_id: str, payload: HexCellUpdate, repository: CampaignToolsRe
     return item
 
 
+@router.delete("/hexes/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_hex(item_id: str, confirm: bool = False, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if not confirm:
+        raise HTTPException(status_code=409, detail="Cal confirm=true per eliminar l'hex")
+    try:
+        deleted = repository.delete_hex(item_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Hex no trobat")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/campaigns/{campaign_id}/hexes/reveal")
+def reveal_hexes(campaign_id: str, payload: HexRevealRequest,
+                 repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    try:
+        return repository.reveal_hexes(campaign_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get("/campaigns/{campaign_id}/hexcrawl-settings")
 def get_hexcrawl_settings(campaign_id: str, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
     return repository.get_hexcrawl_settings(campaign_id)
@@ -586,6 +628,16 @@ def update_expedition(campaign_id: str, payload: ExpeditionStateUpdate, reposito
 def travel(campaign_id: str, payload: TravelRequest, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), world: SQLiteRepository = Depends(get_repository), simulation: SimulationRepository = Depends(get_simulation_repository)):
     try:
         return TravelService(repository, world, simulation).travel(campaign_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/campaigns/{campaign_id}/rest", status_code=status.HTTP_201_CREATED)
+def rest(campaign_id: str, payload: ExpeditionRestRequest,
+         repository: CampaignToolsRepository = Depends(get_campaign_tools_repository),
+         world: SQLiteRepository = Depends(get_repository)):
+    try:
+        return RestService(repository, world).rest(campaign_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -660,10 +712,14 @@ def create_combat(payload: CombatCreate, world: SQLiteRepository = Depends(get_r
 
 
 @router.patch("/combats/{combat_id}")
-def update_combat(combat_id: str, payload: CombatUpdate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+def update_combat(combat_id: str, payload: CombatUpdate,
+                  repository: CampaignToolsRepository = Depends(get_campaign_tools_repository),
+                  simulation: SimulationRepository = Depends(get_simulation_repository)):
     item = repository.update_combat(combat_id, payload)
     if not item:
         raise HTTPException(status_code=404, detail="Combat no trobat")
+    if item.encounter_id and payload.status:
+        simulation.update_encounter_status(item.encounter_id, "resolved" if payload.status == "completed" else "generated")
     return item
 
 
@@ -677,21 +733,8 @@ def add_combatant(combat_id: str, payload: CombatantCreate, repository: Campaign
 
 @router.post("/combats/{combat_id}/combatants/from-reference", status_code=status.HTTP_201_CREATED)
 def add_reference_combatant(combat_id: str, payload: ReferenceCombatantCreate, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
-    reference = ReferenceCatalog().get(payload.reference_id)
-    if not reference or reference.get("category") != "monsters":
-        raise HTTPException(status_code=404, detail="Monstre no trobat al catàleg SRD")
-    data = reference.get("data", {})
-    raw_ac = data.get("armor_class", 10)
-    armor_class = raw_ac[0].get("value", 10) if isinstance(raw_ac, list) and raw_ac else raw_ac if isinstance(raw_ac, int) else 10
-    actions = [{"name": action.get("name", "Acció"), "description": action.get("desc", ""), "source": "SRD 5.1"}
-               for action in data.get("actions", [])[:20]]
     try:
-        created = [repository.add_combatant(combat_id, CombatantCreate(
-            name=(payload.name or reference["name"]) + (f" {index + 1}" if payload.quantity > 1 else ""),
-            kind="enemy", initiative=payload.initiative - index,
-            armor_class=armor_class, max_hp=max(1, int(data.get("hit_points", 1))), actions=actions,
-            reference_id=payload.reference_id,
-        )) for index in range(payload.quantity)]
+        created = _add_reference_combatants(repository, combat_id, payload)
         return created[0] if payload.quantity == 1 else created
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -832,6 +875,48 @@ def generate_encounter(payload: EncounterRequest, repository: SimulationReposito
         return GenerationService(repository, world).generate_encounter(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/encounters/{encounter_id}/combat", status_code=status.HTTP_201_CREATED)
+def encounter_to_combat(encounter_id: str, payload: EncounterCombatRequest,
+                        simulation: SimulationRepository = Depends(get_simulation_repository),
+                        tools: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    encounter = simulation.get_encounter(encounter_id)
+    if not encounter:
+        raise HTTPException(status_code=404, detail="Encounter no trobat")
+    if any(item.encounter_id == encounter_id for item in tools.list_combats(encounter.campaign_id)):
+        raise HTTPException(status_code=409, detail="Aquest encounter ja té un combat preparat")
+    if encounter.encounter_type not in {"combat", "mixed"} and not payload.reference_id:
+        raise HTTPException(status_code=422, detail="Aquest encounter no és de combat; tria manualment un monstre per forçar-lo")
+
+    reference_id = payload.reference_id
+    if not reference_id:
+        reference = ReferenceCatalog().monster_for_level(
+            encounter.party_level, encounter.party_size, encounter.difficulty, encounter.terrain,
+        )
+        reference_id = reference["id"] if reference else None
+    if not reference_id:
+        raise HTTPException(status_code=422, detail="No s'ha trobat cap adversari SRD compatible")
+    selected_reference = ReferenceCatalog().get(reference_id)
+    if not selected_reference or selected_reference.get("category") != "monsters":
+        raise HTTPException(status_code=422, detail="El monstre seleccionat no existeix al catàleg SRD")
+
+    combat = tools.create_combat(CombatCreate(
+        campaign_id=encounter.campaign_id, name=encounter.title, encounter_id=encounter.id,
+    ))
+    try:
+        _add_reference_combatants(tools, combat.id, ReferenceCombatantCreate(
+            reference_id=reference_id, quantity=payload.quantity,
+        ))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if payload.roll_initiative:
+        prepared = tools.get_combat(combat.id)
+        if prepared:
+            tools.roll_initiative(combat.id, {
+                item.id: secrets.randbelow(20) + 1 for item in prepared.combatants
+            })
+    return tools.get_combat(combat.id)
 
 
 @router.get("/rewards")

@@ -1,5 +1,25 @@
 # Registre de canvis
 
+## 2026-08-14 14:53 — Continuïtat d'expedició i encounters
+
+Hora: 14:53, Europe/Madrid.
+
+Canvi fet:
+
+- afegits revelat i exploració radial de zones del mapa;
+- incorporada eliminació segura d'hexàgons, protegint sempre la posició actual;
+- implementats descansos curts i llargs amb provisions, campament, esgotament, orientació i calendari;
+- registrats els descansos dins del diari persistent de l'expedició;
+- creat el flux automàtic d'encounter a combat amb adversaris SRD i iniciativa;
+- sincronitzat l'estat resolt de l'encounter en finalitzar o reobrir el combat;
+- reorganitzats els controls avançats en blocs plegables, resums visuals i accions contextuals;
+- creat un menú de configuració per activar o ocultar tots els mòduls i generadors;
+- afegits mode essencial, mode compacte, panell contextual opcional, text ampliat i reducció d'animacions;
+- desades les preferències exclusivament al navegador, amb restauració dels valors inicials;
+- ampliades API, proves i documentació, i actualitzada la versió a `0.7.0`.
+
+Motiu: reduir feina repetitiva durant la sessió i mantenir còmodes les pantalles amb molta informació.
+
 ## 2026-08-14 14:26 — Player View, hexcrawl modular i combat avançat
 
 Hora: 14:26, Europe/Madrid.
