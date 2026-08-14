@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import {
-  BookLock, ChevronRight, CircleAlert, CloudRain, Copy, Dices, Eye, EyeOff,
-  Footprints, HeartPulse, MapPinned, Minus, MonitorUp, Navigation,
+  Backpack, BookLock, ChevronRight, CircleAlert, CloudRain, Copy, Dices, Eye, EyeOff,
+  Footprints, Heart, HeartPulse, MapPinned, Minus, MonitorUp, Navigation,
   Moon, Plus, RefreshCw, ScanLine, Search, Shield, Skull, Sparkles, Swords, Trash2, Users,
   Utensils, Waves, X,
 } from 'lucide-react'
@@ -63,6 +63,8 @@ export function PlayerViewManager({data,changed}:{data:Dashboard;changed:()=>voi
         <Toggle label="Clima" description="Mostra el clima actual dins del bloc de recursos." checked={settings.show_weather} onChange={value=>void patch({show_weather:value})}/>
         <Toggle label="Combat" description="Iniciativa, torn, condicions i estat general." checked={settings.show_combat} onChange={value=>void patch({show_combat:value})}/>
         <Toggle label="PG dels enemics" description="Si està desactivat, només veuran sa, ferit o fora de combat." checked={settings.show_enemy_hp} onChange={value=>void patch({show_enemy_hp:value})}/>
+        <Toggle label="Personatges" description="Fitxes resumides dels membres que el DM hagi marcat com a visibles." checked={settings.show_characters} onChange={value=>void patch({show_characters:value})}/>
+        <Toggle label="Inventari i tresoreria" description="Equip compartit i monedes del grup, sense objectes privats." checked={settings.show_inventory} onChange={value=>void patch({show_inventory:value})}/>
       </section>
       <section className="studio-card player-launch"><div className="screen-preview"><MonitorUp/><strong>{data.campaign.name}</strong><span>Dia {data.campaign.current_day}</span></div><label>Enllaç de la pantalla<input readOnly value={url}/></label><div className="button-row"><button onClick={()=>void navigator.clipboard.writeText(url)}><Copy size={15}/> Copiar</button><button className="primary" disabled={!settings.enabled} onClick={()=>window.open(url,'gm-ai-player')}><MonitorUp size={15}/> Obrir pantalla</button></div><p className="muted">En ús local, obre-la en una segona finestra o monitor. Quan el projecte es publiqui, caldrà afegir autenticació si no vols que qualsevol persona amb l’URL hi accedeixi.</p></section>
     </div>
@@ -83,7 +85,9 @@ export function PlayerScreenApp({campaignId}:{campaignId:string}){
   const combat=data.combats[0]
   return <div className="player-screen"><header><div className="brand-mark">GM</div><div><span>{data.party.name}</span><strong>{data.campaign.name}</strong></div><div className="player-day">Dia {data.campaign.current_day}<i/></div></header><main>
     <section className="player-hero"><span className="eyebrow">Crònica compartida</span><h1>El que sap l’expedició</h1><p>Actualització automàtica cada pocs segons.</p></section>
+    {data.characters.length>0&&<section className="player-party"><h2><Users/> Companys d’aventura</h2><div>{data.characters.map(character=><article key={character.id}><span><strong>{character.name}</strong><small>{character.ancestry} {character.class_name} · nivell {character.level}</small></span><b><Shield/> {character.armor_class}</b><b><Heart/> {character.current_hp}/{character.max_hp}</b></article>)}</div></section>}
     {data.expedition&&<section className="player-resources"><div><Utensils/><span>Menjar<strong>{data.expedition.food}</strong></span></div><div><Waves/><span>Aigua<strong>{data.expedition.water}</strong></span></div><div><Shield/><span>Subministraments<strong>{data.expedition.supplies}</strong></span></div><div><Footprints/><span>Esgotament<strong>{data.expedition.exhaustion}/6</strong></span></div>{data.expedition.weather&&<div><CloudRain/><span>Clima<strong>{weatherNames[data.expedition.weather]??data.expedition.weather}</strong></span></div>}</section>}
+    {data.treasury&&<section className="player-inventory"><h2><Backpack/> Equip compartit</h2><div>{data.inventory.map(item=><span key={item.id}><b>{item.quantity}×</b> {item.name}</span>)}</div><p>{(['cp','sp','ep','gp','pp'] as const).map(unit=><strong key={unit}>{data.treasury?.[unit]} {unit}</strong>)}</p></section>}
     <div className="player-columns"><section><h2><BookLock/> Coneixement revelat</h2>{data.lore.map(item=><article className="player-lore" key={item.id}><span>{item.category}</span><h3>{item.title}</h3><p>{item.content}</p></article>)}{data.rumors.length>0&&<><h2><Sparkles/> Rumors</h2>{data.rumors.map(item=><article className="player-rumor" key={item.id}>{item.content}</article>)}</>}</section><section>{data.hexes.length>0&&<><h2><MapPinned/> Mapa conegut</h2><HexMap hexes={data.hexes} players/></>}{combat&&<div className="player-combat"><h2><Swords/> {combat.name}</h2><div className="round-pill">Ronda {combat.round}</div>{combat.combatants.map((item,index)=><div className={`${index===combat.turn_index?'active':''}`} key={item.id}><b>{item.initiative}</b><span><strong>{item.name}</strong><small>{item.conditions.join(' · ')||item.hp_status}</small></span>{item.current_hp!=null?<em>{item.current_hp}/{item.max_hp} PG</em>:<em>{item.hp_status}</em>}</div>)}</div>}</section></div>
   </main></div>
 }

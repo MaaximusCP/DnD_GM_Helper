@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS combatants (
     concentration INTEGER NOT NULL DEFAULT 0, reaction_available INTEGER NOT NULL DEFAULT 1,
     legendary_actions INTEGER NOT NULL DEFAULT 0, legendary_actions_max INTEGER NOT NULL DEFAULT 0,
     notes TEXT NOT NULL DEFAULT '', conditions TEXT NOT NULL, actions TEXT NOT NULL,
-    source_id TEXT, reference_id TEXT, FOREIGN KEY(combat_id) REFERENCES combats(id)
+    source_id TEXT, reference_id TEXT, character_id TEXT, FOREIGN KEY(combat_id) REFERENCES combats(id)
 );
 CREATE TABLE IF NOT EXISTS hexcrawl_settings (
     campaign_id TEXT PRIMARY KEY, track_weather INTEGER NOT NULL DEFAULT 1,
@@ -172,11 +172,42 @@ CREATE TABLE IF NOT EXISTS player_view_settings (
     campaign_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, show_map INTEGER NOT NULL DEFAULT 1,
     show_rumors INTEGER NOT NULL DEFAULT 1, show_resources INTEGER NOT NULL DEFAULT 1,
     show_weather INTEGER NOT NULL DEFAULT 1, show_combat INTEGER NOT NULL DEFAULT 1,
-    show_enemy_hp INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+    show_enemy_hp INTEGER NOT NULL DEFAULT 0, show_characters INTEGER NOT NULL DEFAULT 1,
+    show_inventory INTEGER NOT NULL DEFAULT 1, FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 CREATE TABLE IF NOT EXISTS combat_logs (
     id TEXT PRIMARY KEY, combat_id TEXT NOT NULL, message TEXT NOT NULL, kind TEXT NOT NULL,
     created_at TEXT NOT NULL, FOREIGN KEY(combat_id) REFERENCES combats(id)
+);
+CREATE TABLE IF NOT EXISTS characters (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, name TEXT NOT NULL, player_name TEXT NOT NULL DEFAULT '',
+    class_name TEXT NOT NULL DEFAULT 'Aventurer', ancestry TEXT NOT NULL DEFAULT '', level INTEGER NOT NULL DEFAULT 1,
+    armor_class INTEGER NOT NULL DEFAULT 10, max_hp INTEGER NOT NULL DEFAULT 1, current_hp INTEGER NOT NULL DEFAULT 1,
+    temp_hp INTEGER NOT NULL DEFAULT 0, speed INTEGER NOT NULL DEFAULT 30, ability_scores TEXT NOT NULL DEFAULT '{}',
+    saving_throws TEXT NOT NULL DEFAULT '[]', skills TEXT NOT NULL DEFAULT '[]', passive_perception INTEGER NOT NULL DEFAULT 10,
+    exhaustion INTEGER NOT NULL DEFAULT 0, conditions TEXT NOT NULL DEFAULT '[]', spell_slots TEXT NOT NULL DEFAULT '{}',
+    spell_slots_max TEXT NOT NULL DEFAULT '{}', resources TEXT NOT NULL DEFAULT '[]', notes TEXT NOT NULL DEFAULT '',
+    share_with_players INTEGER NOT NULL DEFAULT 1, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS treasury (
+    campaign_id TEXT PRIMARY KEY, cp REAL NOT NULL DEFAULT 0, sp REAL NOT NULL DEFAULT 0,
+    ep REAL NOT NULL DEFAULT 0, gp REAL NOT NULL DEFAULT 0, pp REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL, FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS inventory_items (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, owner_type TEXT NOT NULL DEFAULT 'party', owner_id TEXT,
+    name TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'gear', quantity REAL NOT NULL DEFAULT 1,
+    weight REAL NOT NULL DEFAULT 0, value REAL NOT NULL DEFAULT 0, currency_unit TEXT NOT NULL DEFAULT 'gp',
+    description TEXT NOT NULL DEFAULT '', equipped INTEGER NOT NULL DEFAULT 0, attuned INTEGER NOT NULL DEFAULT 0,
+    consumable INTEGER NOT NULL DEFAULT 0, reference_id TEXT, source_id TEXT, reward_id TEXT, created_at TEXT NOT NULL,
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+);
+CREATE TABLE IF NOT EXISTS inventory_transactions (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, kind TEXT NOT NULL, description TEXT NOT NULL,
+    item_id TEXT, character_id TEXT, currency TEXT, currency_delta REAL NOT NULL DEFAULT 0,
+    quantity_delta REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 """
 
@@ -218,6 +249,18 @@ class Database:
             for name, definition in combatant_migrations.items():
                 if name not in combatant_columns:
                     connection.execute(f"ALTER TABLE combatants ADD COLUMN {name} {definition}")
+            if "character_id" not in combatant_columns:
+                connection.execute("ALTER TABLE combatants ADD COLUMN character_id TEXT")
+            reward_columns = {row["name"] for row in connection.execute("PRAGMA table_info(rewards)")}
+            if "claimed" not in reward_columns:
+                connection.execute("ALTER TABLE rewards ADD COLUMN claimed INTEGER NOT NULL DEFAULT 0")
+            if "claimed_at" not in reward_columns:
+                connection.execute("ALTER TABLE rewards ADD COLUMN claimed_at TEXT")
+            player_columns = {row["name"] for row in connection.execute("PRAGMA table_info(player_view_settings)")}
+            if "show_characters" not in player_columns:
+                connection.execute("ALTER TABLE player_view_settings ADD COLUMN show_characters INTEGER NOT NULL DEFAULT 1")
+            if "show_inventory" not in player_columns:
+                connection.execute("ALTER TABLE player_view_settings ADD COLUMN show_inventory INTEGER NOT NULL DEFAULT 1")
             travel_columns = {row["name"] for row in connection.execute("PRAGMA table_info(travel_logs)")}
             if "encounter_id" not in travel_columns:
                 connection.execute("ALTER TABLE travel_logs ADD COLUMN encounter_id TEXT")
@@ -237,6 +280,29 @@ class Database:
             self._seed(connection)
             self._seed_generation(connection)
             self._seed_campaign_tools(connection)
+            self._seed_party(connection)
+
+    def _seed_party(self, db: sqlite3.Connection) -> None:
+        if not db.execute("SELECT 1 FROM campaigns WHERE id='demo'").fetchone():
+            return
+        db.execute("INSERT OR IGNORE INTO treasury(campaign_id,updated_at,gp) VALUES ('demo',datetime('now'),125)")
+        if db.execute("SELECT 1 FROM characters WHERE campaign_id='demo' LIMIT 1").fetchone():
+            return
+        samples = [
+            ("char_aria", "Aria Ventclar", "Marta", "Exploradora", "Humana", 4, 15, 34, 29, 35, 15, 1),
+            ("char_borin", "Borin Rocafort", "Pau", "Guerrer", "Nan", 4, 18, 44, 44, 25, 12, 0),
+            ("char_nim", "Nim de la Boira", "Laia", "Druida", "Elfa", 4, 14, 31, 24, 30, 16, 0),
+        ]
+        for item in samples:
+            values = (item[0], "demo", *item[1:], json.dumps({"str":10,"dex":14,"con":12,"int":10,"wis":14,"cha":10}),
+                      "[]", "[]", "[]", json.dumps({"1":2,"2":1}), json.dumps({"1":4,"2":3}),
+                      json.dumps([{"name":"Inspiració","current":1,"maximum":1,"reset":"long"}]))
+            db.execute("""INSERT INTO characters(id,campaign_id,name,player_name,class_name,ancestry,level,armor_class,max_hp,
+                current_hp,speed,passive_perception,exhaustion,ability_scores,saving_throws,skills,conditions,spell_slots,
+                spell_slots_max,resources,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))""", values)
+        db.execute("""INSERT OR IGNORE INTO inventory_items(id,campaign_id,owner_type,name,category,quantity,weight,value,
+            currency_unit,description,consumable,created_at) VALUES ('item_rations','demo','party','Racions','supplies',8,2,0.5,'gp',
+            'Menjar per a una jornada',1,datetime('now'))""")
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

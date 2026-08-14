@@ -6,6 +6,7 @@ from app.domain.models import (
 )
 from app.infrastructure.campaign_tools_repository import CampaignToolsRepository
 from app.infrastructure.repository import SQLiteRepository
+from app.infrastructure.party_repository import PartyRepository
 
 
 class RestService:
@@ -63,6 +64,11 @@ class RestService:
         ))
         if day_advanced:
             self.world.update_campaign(campaign_id, CampaignUpdate(current_day=campaign.current_day + day_advanced))
+        characters_recovered = PartyRepository(self.tools.database).apply_rest(
+            campaign_id, request.rest_type, request.safe_camp and not shortage,
+        )
+        if characters_recovered:
+            notes.append(f"Personatges recuperats: {', '.join(characters_recovered)}")
 
         log = self.tools.save_travel_log(TravelLog(
             id=f"rest_{uuid4().hex[:12]}", campaign_id=campaign_id,
@@ -76,4 +82,5 @@ class RestService:
             state=updated, log=log, food_used=food_used, water_used=water_used,
             supplies_used=supplies_used, exhaustion_delta=exhaustion_delta,
             day_advanced=day_advanced, notes=notes,
+            characters_recovered=characters_recovered,
         )

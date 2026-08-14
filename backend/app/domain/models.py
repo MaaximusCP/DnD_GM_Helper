@@ -274,6 +274,7 @@ class ExpeditionRestResult(BaseModel):
     exhaustion_delta: int = 0
     day_advanced: int = 0
     notes: list[str] = Field(default_factory=list)
+    characters_recovered: list[str] = Field(default_factory=list)
 
 
 class PlayerViewSettings(BaseModel):
@@ -285,6 +286,8 @@ class PlayerViewSettings(BaseModel):
     show_weather: bool = True
     show_combat: bool = True
     show_enemy_hp: bool = False
+    show_characters: bool = True
+    show_inventory: bool = True
 
 
 class PlayerViewSettingsUpdate(BaseModel):
@@ -295,6 +298,201 @@ class PlayerViewSettingsUpdate(BaseModel):
     show_weather: bool | None = None
     show_combat: bool | None = None
     show_enemy_hp: bool | None = None
+    show_characters: bool | None = None
+    show_inventory: bool | None = None
+
+
+class CharacterResource(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    current: int = Field(default=0, ge=0, le=999)
+    maximum: int = Field(default=0, ge=0, le=999)
+    reset: Literal["short", "long", "manual"] = "long"
+
+
+class Character(BaseModel):
+    id: str
+    campaign_id: str
+    name: str
+    player_name: str = ""
+    class_name: str = "Aventurer"
+    ancestry: str = ""
+    level: int = Field(default=1, ge=1, le=20)
+    armor_class: int = Field(default=10, ge=0, le=40)
+    max_hp: int = Field(default=1, ge=1, le=10000)
+    current_hp: int = Field(default=1, ge=0, le=10000)
+    temp_hp: int = Field(default=0, ge=0, le=10000)
+    speed: int = Field(default=30, ge=0, le=300)
+    ability_scores: dict[str, int] = Field(default_factory=lambda: {key: 10 for key in ("str", "dex", "con", "int", "wis", "cha")})
+    saving_throws: list[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    passive_perception: int = Field(default=10, ge=0, le=50)
+    exhaustion: int = Field(default=0, ge=0, le=6)
+    conditions: list[str] = Field(default_factory=list)
+    spell_slots: dict[str, int] = Field(default_factory=dict)
+    spell_slots_max: dict[str, int] = Field(default_factory=dict)
+    resources: list[CharacterResource] = Field(default_factory=list)
+    notes: str = ""
+    share_with_players: bool = True
+    active: bool = True
+    created_at: str = Field(default_factory=utc_now)
+
+
+class CharacterCreate(BaseModel):
+    campaign_id: str = "demo"
+    name: str = Field(min_length=2, max_length=120)
+    player_name: str = Field(default="", max_length=120)
+    class_name: str = Field(default="Aventurer", max_length=120)
+    ancestry: str = Field(default="", max_length=120)
+    level: int = Field(default=1, ge=1, le=20)
+    armor_class: int = Field(default=10, ge=0, le=40)
+    max_hp: int = Field(default=10, ge=1, le=10000)
+    current_hp: int | None = Field(default=None, ge=0, le=10000)
+    temp_hp: int = Field(default=0, ge=0, le=10000)
+    speed: int = Field(default=30, ge=0, le=300)
+    ability_scores: dict[str, int] = Field(default_factory=lambda: {key: 10 for key in ("str", "dex", "con", "int", "wis", "cha")})
+    saving_throws: list[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    passive_perception: int = Field(default=10, ge=0, le=50)
+    exhaustion: int = Field(default=0, ge=0, le=6)
+    conditions: list[str] = Field(default_factory=list)
+    spell_slots: dict[str, int] = Field(default_factory=dict)
+    spell_slots_max: dict[str, int] = Field(default_factory=dict)
+    resources: list[CharacterResource] = Field(default_factory=list)
+    notes: str = Field(default="", max_length=5000)
+    share_with_players: bool = True
+    active: bool = True
+
+
+class CharacterUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    player_name: str | None = Field(default=None, max_length=120)
+    class_name: str | None = Field(default=None, max_length=120)
+    ancestry: str | None = Field(default=None, max_length=120)
+    level: int | None = Field(default=None, ge=1, le=20)
+    armor_class: int | None = Field(default=None, ge=0, le=40)
+    max_hp: int | None = Field(default=None, ge=1, le=10000)
+    current_hp: int | None = Field(default=None, ge=0, le=10000)
+    temp_hp: int | None = Field(default=None, ge=0, le=10000)
+    speed: int | None = Field(default=None, ge=0, le=300)
+    ability_scores: dict[str, int] | None = None
+    saving_throws: list[str] | None = None
+    skills: list[str] | None = None
+    passive_perception: int | None = Field(default=None, ge=0, le=50)
+    exhaustion: int | None = Field(default=None, ge=0, le=6)
+    conditions: list[str] | None = None
+    spell_slots: dict[str, int] | None = None
+    spell_slots_max: dict[str, int] | None = None
+    resources: list[CharacterResource] | None = None
+    notes: str | None = Field(default=None, max_length=5000)
+    share_with_players: bool | None = None
+    active: bool | None = None
+
+
+class Treasury(BaseModel):
+    campaign_id: str
+    cp: float = 0
+    sp: float = 0
+    ep: float = 0
+    gp: float = 0
+    pp: float = 0
+    updated_at: str = Field(default_factory=utc_now)
+
+
+class TreasuryUpdate(BaseModel):
+    cp: float | None = Field(default=None, ge=0)
+    sp: float | None = Field(default=None, ge=0)
+    ep: float | None = Field(default=None, ge=0)
+    gp: float | None = Field(default=None, ge=0)
+    pp: float | None = Field(default=None, ge=0)
+
+
+class TreasuryAdjustment(BaseModel):
+    currency: Literal["cp", "sp", "ep", "gp", "pp"] = "gp"
+    amount: float
+    description: str = Field(default="Ajust manual", max_length=300)
+
+
+class InventoryItem(BaseModel):
+    id: str
+    campaign_id: str
+    owner_type: Literal["party", "character", "location"] = "party"
+    owner_id: str | None = None
+    name: str
+    category: str = "gear"
+    quantity: float = Field(default=1, gt=0)
+    weight: float = Field(default=0, ge=0)
+    value: float = Field(default=0, ge=0)
+    currency_unit: Literal["cp", "sp", "ep", "gp", "pp"] = "gp"
+    description: str = ""
+    equipped: bool = False
+    attuned: bool = False
+    consumable: bool = False
+    reference_id: str | None = None
+    source_id: str | None = None
+    reward_id: str | None = None
+    created_at: str = Field(default_factory=utc_now)
+
+
+class InventoryItemCreate(BaseModel):
+    campaign_id: str = "demo"
+    owner_type: Literal["party", "character", "location"] = "party"
+    owner_id: str | None = None
+    name: str = Field(min_length=2, max_length=200)
+    category: str = Field(default="gear", max_length=80)
+    quantity: float = Field(default=1, gt=0, le=100000)
+    weight: float = Field(default=0, ge=0, le=100000)
+    value: float = Field(default=0, ge=0, le=100000000)
+    currency_unit: Literal["cp", "sp", "ep", "gp", "pp"] = "gp"
+    description: str = Field(default="", max_length=5000)
+    equipped: bool = False
+    attuned: bool = False
+    consumable: bool = False
+    reference_id: str | None = None
+    source_id: str | None = None
+    reward_id: str | None = None
+
+
+class InventoryItemUpdate(BaseModel):
+    owner_type: Literal["party", "character", "location"] | None = None
+    owner_id: str | None = None
+    name: str | None = Field(default=None, min_length=2, max_length=200)
+    category: str | None = Field(default=None, max_length=80)
+    quantity: float | None = Field(default=None, gt=0, le=100000)
+    weight: float | None = Field(default=None, ge=0, le=100000)
+    value: float | None = Field(default=None, ge=0, le=100000000)
+    currency_unit: Literal["cp", "sp", "ep", "gp", "pp"] | None = None
+    description: str | None = Field(default=None, max_length=5000)
+    equipped: bool | None = None
+    attuned: bool | None = None
+    consumable: bool | None = None
+
+
+class InventoryConsume(BaseModel):
+    quantity: float = Field(default=1, gt=0)
+    description: str = Field(default="Consum", max_length=300)
+
+
+class InventoryTransaction(BaseModel):
+    id: str
+    campaign_id: str
+    kind: str
+    description: str
+    item_id: str | None = None
+    character_id: str | None = None
+    currency: str | None = None
+    currency_delta: float = 0
+    quantity_delta: float = 0
+    created_at: str = Field(default_factory=utc_now)
+
+
+class RewardClaimRequest(BaseModel):
+    owner_type: Literal["party", "character", "location"] = "party"
+    owner_id: str | None = None
+
+
+class CharacterCombatRequest(BaseModel):
+    character_ids: list[str] = Field(default_factory=list)
+    roll_initiative: bool = True
 
 
 class Combatant(BaseModel):
@@ -317,6 +515,7 @@ class Combatant(BaseModel):
     actions: list[dict] = Field(default_factory=list)
     source_id: str | None = None
     reference_id: str | None = None
+    character_id: str | None = None
 
 
 class CombatantCreate(BaseModel):
@@ -337,6 +536,7 @@ class CombatantCreate(BaseModel):
     actions: list[dict] = Field(default_factory=list, max_length=30)
     source_id: str | None = None
     reference_id: str | None = None
+    character_id: str | None = None
 
 
 class CombatantUpdate(BaseModel):
@@ -737,6 +937,8 @@ class Reward(BaseModel):
     narrative_rewards: list[str] = Field(default_factory=list)
     context_reasons: list[str] = Field(default_factory=list)
     created_at: str = Field(default_factory=utc_now)
+    claimed: bool = False
+    claimed_at: str | None = None
 
 
 class CampaignBundle(CampaignImport):
@@ -754,4 +956,8 @@ class CampaignBundle(CampaignImport):
     expedition_state: ExpeditionState | None = None
     travel_logs: list[TravelLog] = Field(default_factory=list)
     player_view_settings: PlayerViewSettings | None = None
+    characters: list[Character] = Field(default_factory=list)
+    inventory: list[InventoryItem] = Field(default_factory=list)
+    treasury: Treasury | None = None
+    inventory_transactions: list[InventoryTransaction] = Field(default_factory=list)
     excluded_content_notice: str = "Els fitxers de la biblioteca documental no s'inclouen en l'exportació."

@@ -189,14 +189,35 @@ class SimulationRepository:
 
     def save_reward(self, item: Reward) -> Reward:
         with self.database.connect() as db:
-            db.execute("INSERT INTO rewards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (
+            db.execute("""INSERT INTO rewards(id,campaign_id,encounter_id,location_id,terrain,party_level,difficulty,
+                mode,fortune_roll,tier,title,items,narrative_rewards,context_reasons,created_at,claimed,claimed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
                 item.id, item.campaign_id, item.encounter_id, item.location_id, item.terrain,
                 item.party_level, item.difficulty, item.mode, item.fortune_roll, item.tier, item.title,
                 json.dumps(item.items), json.dumps(item.narrative_rewards), json.dumps(item.context_reasons), item.created_at,
+                int(item.claimed), item.claimed_at,
             ))
         return item
+
+    def get_reward(self, reward_id: str) -> Reward | None:
+        with self.database.connect() as db:
+            row = db.execute("SELECT * FROM rewards WHERE id=?", (reward_id,)).fetchone()
+        return self._reward(row) if row else None
+
+    @staticmethod
+    def _reward(row) -> Reward:
+        return Reward(**{**dict(row), "items": json.loads(row["items"]),
+                         "narrative_rewards": json.loads(row["narrative_rewards"]),
+                         "context_reasons": json.loads(row["context_reasons"])})
+
+    def mark_reward_claimed(self, reward_id: str) -> Reward | None:
+        with self.database.connect() as db:
+            if not db.execute("SELECT 1 FROM rewards WHERE id=? AND claimed=0", (reward_id,)).fetchone():
+                return None
+            db.execute("UPDATE rewards SET claimed=1,claimed_at=? WHERE id=?", (utc_now(), reward_id))
+        return self.get_reward(reward_id)
 
     def list_rewards(self, campaign_id: str) -> list[Reward]:
         with self.database.connect() as db:
             rows = db.execute("SELECT * FROM rewards WHERE campaign_id=? ORDER BY created_at DESC", (campaign_id,))
-            return [Reward(**{**dict(row), "items": json.loads(row["items"]), "narrative_rewards": json.loads(row["narrative_rewards"]), "context_reasons": json.loads(row["context_reasons"])}) for row in rows]
+            return [self._reward(row) for row in rows]

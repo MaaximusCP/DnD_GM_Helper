@@ -1944,16 +1944,15 @@ Objectiu: validar l'experiència real del DM des del primer moment.
 - control de disponibilitat d'objectes màgics;
 - coherència amb economia i progressió.
 
-## Versió 0.8 — Poliment de l'aplicació local
+## Versió 0.8 — Party Core i poliment local
 
-- instal·lador o launcher;
-- iniciar backend i LLM de manera assistida;
-- dashboard refinat;
-- millor cerca;
-- backups;
-- gestió de configuració;
-- mètriques locals de rendiment;
-- importació/exportació robusta.
+- personatges jugadors persistents amb PG, CA, atributs, estats, recursos i visibilitat;
+- inventari compartit, individual i per ubicació;
+- tresoreria multimoneda i historial de moviments;
+- botí reclamable sense duplicats;
+- sincronització amb descansos, combat i pantalla de jugadors;
+- launcher, dashboard refinat, backups i gestió de configuració;
+- importació/exportació robusta de tot el Party Core.
 
 ## Versió 0.9 — Azure opcional
 

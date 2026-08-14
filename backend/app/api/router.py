@@ -27,6 +27,9 @@ from app.domain.models import (
     CombatantDuplicate, CombatRollRequest, InitiativeRequest,
     EncounterCombatRequest, ExpeditionRestRequest, ExpeditionStateUpdate, HexcrawlSettingsUpdate,
     HexRevealRequest, PlayerViewSettingsUpdate, TravelRequest,
+    CharacterCreate, CharacterUpdate, CharacterCombatRequest,
+    InventoryItemCreate, InventoryItemUpdate, InventoryConsume,
+    TreasuryUpdate, TreasuryAdjustment, RewardClaimRequest,
 )
 from app.infrastructure.campaign_tools_repository import CampaignToolsRepository
 from app.infrastructure.content_repository import ContentRepository
@@ -35,6 +38,7 @@ from app.infrastructure.llm import create_provider
 from app.infrastructure.repository import SQLiteRepository
 from app.infrastructure.reference_catalog import ReferenceCatalog
 from app.infrastructure.simulation_repository import SimulationRepository
+from app.infrastructure.party_repository import PartyRepository
 
 
 router = APIRouter()
@@ -54,6 +58,10 @@ def get_simulation_repository(settings: Settings = Depends(get_settings)) -> Sim
 
 def get_campaign_tools_repository(settings: Settings = Depends(get_settings)) -> CampaignToolsRepository:
     return CampaignToolsRepository(Database(settings.database_path))
+
+
+def get_party_repository(settings: Settings = Depends(get_settings)) -> PartyRepository:
+    return PartyRepository(Database(settings.database_path))
 
 
 def _add_reference_combatants(repository: CampaignToolsRepository, combat_id: str,
@@ -90,7 +98,7 @@ def create_campaign(payload: CampaignCreate, repository: SQLiteRepository = Depe
 
 
 @router.get("/campaigns/{campaign_id}")
-def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_repository), tools: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_repository), tools: CampaignToolsRepository = Depends(get_campaign_tools_repository), party_repo: PartyRepository = Depends(get_party_repository)):
     campaign = repository.get_campaign(campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campanya no trobada")
@@ -114,6 +122,10 @@ def get_dashboard(campaign_id: str, repository: SQLiteRepository = Depends(get_r
         "combats": tools.list_combats(campaign_id),
         "hexcrawl_settings": tools.get_hexcrawl_settings(campaign_id),
         "expedition_state": tools.get_expedition_state(campaign_id),
+        "characters": party_repo.list_characters(campaign_id),
+        "inventory": party_repo.list_inventory(campaign_id),
+        "treasury": party_repo.get_treasury(campaign_id),
+        "inventory_transactions": party_repo.list_transactions(campaign_id),
         "travel_logs": tools.list_travel_logs(campaign_id),
         "player_view_settings": tools.get_player_view_settings(campaign_id),
     }
@@ -653,7 +665,7 @@ def update_player_view_settings(campaign_id: str, payload: PlayerViewSettingsUpd
 
 
 @router.get("/player-view/{campaign_id}")
-def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_repository), repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), simulation: SimulationRepository = Depends(get_simulation_repository)):
+def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_repository), repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), simulation: SimulationRepository = Depends(get_simulation_repository), party_repo: PartyRepository = Depends(get_party_repository)):
     campaign = world.get_campaign(campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campanya no trobada")
@@ -695,8 +707,107 @@ def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_reposito
         "expedition": {"food": expedition.food, "water": expedition.water, "supplies": expedition.supplies,
                        "exhaustion": expedition.exhaustion, "lost": expedition.lost,
                        "weather": expedition.weather if settings.show_weather else None} if settings.show_resources else None,
+        "characters": [item.model_dump() for item in party_repo.list_characters(campaign_id, active_only=True)
+                       if item.share_with_players] if settings.show_characters else [],
+        "inventory": [item.model_dump() for item in party_repo.list_inventory(campaign_id, "party")]
+                     if settings.show_inventory else [],
+        "treasury": party_repo.get_treasury(campaign_id).model_dump() if settings.show_inventory else None,
         "combats": combats, "settings": settings,
     }
+
+
+@router.get("/characters")
+def list_characters(campaign_id: str = "demo", repository: PartyRepository = Depends(get_party_repository)):
+    return repository.list_characters(campaign_id)
+
+
+@router.post("/characters", status_code=status.HTTP_201_CREATED)
+def create_character(payload: CharacterCreate, world: SQLiteRepository = Depends(get_repository), repository: PartyRepository = Depends(get_party_repository)):
+    if not world.get_campaign(payload.campaign_id):
+        raise HTTPException(status_code=404, detail="Campanya no trobada")
+    return repository.create_character(payload)
+
+
+@router.patch("/characters/{item_id}")
+def update_character(item_id: str, payload: CharacterUpdate, repository: PartyRepository = Depends(get_party_repository)):
+    item = repository.update_character(item_id, payload)
+    if not item:
+        raise HTTPException(status_code=404, detail="Personatge no trobat")
+    return item
+
+
+@router.delete("/characters/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_character(item_id: str, confirm: bool = False, repository: PartyRepository = Depends(get_party_repository)):
+    if not confirm:
+        raise HTTPException(status_code=409, detail="Cal confirm=true per eliminar el personatge")
+    if not repository.delete_character(item_id):
+        raise HTTPException(status_code=404, detail="Personatge no trobat")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/inventory")
+def list_inventory(campaign_id: str = "demo", owner_type: str | None = None, owner_id: str | None = None,
+                   repository: PartyRepository = Depends(get_party_repository)):
+    return repository.list_inventory(campaign_id, owner_type, owner_id)
+
+
+@router.post("/inventory", status_code=status.HTTP_201_CREATED)
+def create_inventory(payload: InventoryItemCreate, repository: PartyRepository = Depends(get_party_repository)):
+    try:
+        return repository.create_inventory_item(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.patch("/inventory/{item_id}")
+def update_inventory(item_id: str, payload: InventoryItemUpdate, repository: PartyRepository = Depends(get_party_repository)):
+    try:
+        item = repository.update_inventory_item(item_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not item:
+        raise HTTPException(status_code=404, detail="Objecte no trobat")
+    return item
+
+
+@router.post("/inventory/{item_id}/consume")
+def consume_inventory(item_id: str, payload: InventoryConsume, repository: PartyRepository = Depends(get_party_repository)):
+    try:
+        return {"item": repository.consume_inventory_item(item_id, payload)}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.delete("/inventory/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_inventory(item_id: str, confirm: bool = False, repository: PartyRepository = Depends(get_party_repository)):
+    if not confirm:
+        raise HTTPException(status_code=409, detail="Cal confirm=true per eliminar l'objecte")
+    if not repository.delete_inventory_item(item_id):
+        raise HTTPException(status_code=404, detail="Objecte no trobat")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/campaigns/{campaign_id}/treasury")
+def get_treasury(campaign_id: str, repository: PartyRepository = Depends(get_party_repository)):
+    return repository.get_treasury(campaign_id)
+
+
+@router.patch("/campaigns/{campaign_id}/treasury")
+def update_treasury(campaign_id: str, payload: TreasuryUpdate, repository: PartyRepository = Depends(get_party_repository)):
+    return repository.update_treasury(campaign_id, payload)
+
+
+@router.post("/campaigns/{campaign_id}/treasury/adjust")
+def adjust_treasury(campaign_id: str, payload: TreasuryAdjustment, repository: PartyRepository = Depends(get_party_repository)):
+    try:
+        return repository.adjust_treasury(campaign_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/campaigns/{campaign_id}/inventory-transactions")
+def inventory_transactions(campaign_id: str, repository: PartyRepository = Depends(get_party_repository)):
+    return repository.list_transactions(campaign_id)
 
 
 @router.get("/combats")
@@ -729,6 +840,32 @@ def add_combatant(combat_id: str, payload: CombatantCreate, repository: Campaign
         return repository.add_combatant(combat_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/combats/{combat_id}/characters", status_code=status.HTTP_201_CREATED)
+def add_characters_to_combat(combat_id: str, payload: CharacterCombatRequest,
+                             tools: CampaignToolsRepository = Depends(get_campaign_tools_repository),
+                             party_repo: PartyRepository = Depends(get_party_repository)):
+    combat = tools.get_combat(combat_id)
+    if not combat:
+        raise HTTPException(status_code=404, detail="Combat no trobat")
+    ids = payload.character_ids or [item.id for item in party_repo.list_characters(combat.campaign_id, active_only=True)]
+    existing = {item.character_id for item in combat.combatants if item.character_id}
+    created = []
+    for character_id in ids:
+        character = party_repo.get_character(character_id)
+        if not character or character.campaign_id != combat.campaign_id or character_id in existing:
+            continue
+        created.append(tools.add_combatant(combat_id, CombatantCreate(
+            name=character.name, kind="player", initiative=10,
+            initiative_bonus=(character.ability_scores.get("dex", 10) - 10) // 2,
+            armor_class=character.armor_class, max_hp=character.max_hp, current_hp=character.current_hp,
+            temp_hp=character.temp_hp, conditions=character.conditions, notes=character.notes,
+            character_id=character.id,
+        )))
+    if payload.roll_initiative and created:
+        tools.roll_initiative(combat_id, {item.id: secrets.randbelow(20) + 1 for item in created})
+    return tools.get_combat(combat_id)
 
 
 @router.post("/combats/{combat_id}/combatants/from-reference", status_code=status.HTTP_201_CREATED)
@@ -930,3 +1067,38 @@ def generate_reward(payload: RewardRequest, repository: SimulationRepository = D
         return GenerationService(repository, world).generate_reward(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/rewards/{reward_id}/claim")
+def claim_reward(reward_id: str, payload: RewardClaimRequest,
+                 simulation: SimulationRepository = Depends(get_simulation_repository),
+                 party_repo: PartyRepository = Depends(get_party_repository)):
+    reward = simulation.get_reward(reward_id)
+    if not reward:
+        raise HTTPException(status_code=404, detail="Recompensa no trobada")
+    if reward.claimed:
+        raise HTTPException(status_code=409, detail="Aquesta recompensa ja s'ha reclamat")
+    created = []
+    currencies = {"cp", "sp", "ep", "gp", "pp"}
+    try:
+        for raw in reward.items:
+            name = str(raw.get("name", "Recompensa"))
+            quantity = max(0.01, float(raw.get("quantity", 1)))
+            unit = str(raw.get("currency_unit", "")).lower()
+            category = str(raw.get("category", "treasure"))
+            detected = unit if unit in currencies else next((coin for coin in currencies if coin in name.lower().split()), None)
+            if category == "currency" or detected:
+                party_repo.adjust_treasury(reward.campaign_id, TreasuryAdjustment(
+                    currency=detected or "gp", amount=quantity, description=f"Botí: {reward.title}",
+                ))
+            else:
+                created.append(party_repo.create_inventory_item(InventoryItemCreate(
+                    campaign_id=reward.campaign_id, owner_type=payload.owner_type, owner_id=payload.owner_id,
+                    name=name, category=category, quantity=quantity, weight=float(raw.get("weight", 0) or 0),
+                    value=float(raw.get("value", 0) or 0), description=str(raw.get("description", "")),
+                    consumable=bool(raw.get("consumable", False)), reference_id=raw.get("reference_id"), reward_id=reward.id,
+                )))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    claimed = simulation.mark_reward_claimed(reward_id)
+    return {"reward": claimed, "items": created, "treasury": party_repo.get_treasury(reward.campaign_id)}

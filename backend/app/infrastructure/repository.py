@@ -407,8 +407,10 @@ class SQLiteRepository:
             return None
         from app.infrastructure.simulation_repository import SimulationRepository
         from app.infrastructure.campaign_tools_repository import CampaignToolsRepository
+        from app.infrastructure.party_repository import PartyRepository
         simulation = SimulationRepository(self.database)
         tools = CampaignToolsRepository(self.database)
+        party_repo = PartyRepository(self.database)
         return CampaignBundle(
             campaign=campaign, locations=self.list_locations(campaign_id), factions=self.list_factions(campaign_id),
             npcs=self.list_npcs(campaign_id), events=self.list_events(campaign_id, 10000),
@@ -423,6 +425,9 @@ class SQLiteRepository:
             expedition_state=tools.get_expedition_state(campaign_id),
             travel_logs=tools.list_travel_logs(campaign_id, 10000),
             player_view_settings=tools.get_player_view_settings(campaign_id),
+            characters=party_repo.list_characters(campaign_id), inventory=party_repo.list_inventory(campaign_id),
+            treasury=party_repo.get_treasury(campaign_id),
+            inventory_transactions=party_repo.list_transactions(campaign_id, 10000),
         )
 
     def import_campaign(self, package: CampaignBundle) -> Campaign:
@@ -477,7 +482,12 @@ class SQLiteRepository:
             for item in package.encounters:
                 db.execute("INSERT INTO encounters VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (item.id, c.id, item.location_id, item.terrain, item.party_level, item.party_size, item.difficulty, item.encounter_type, item.title, item.description, json.dumps(item.objectives), json.dumps(item.complications), json.dumps(item.context_reasons), item.status, item.created_at))
             for item in package.rewards:
-                db.execute("INSERT INTO rewards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (item.id, c.id, item.encounter_id, item.location_id, item.terrain, item.party_level, item.difficulty, item.mode, item.fortune_roll, item.tier, item.title, json.dumps(item.items), json.dumps(item.narrative_rewards), json.dumps(item.context_reasons), item.created_at))
+                db.execute("""INSERT INTO rewards(id,campaign_id,encounter_id,location_id,terrain,party_level,difficulty,mode,
+                           fortune_roll,tier,title,items,narrative_rewards,context_reasons,created_at,claimed,claimed_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (item.id, c.id, item.encounter_id, item.location_id,
+                           item.terrain, item.party_level, item.difficulty, item.mode, item.fortune_roll, item.tier, item.title,
+                           json.dumps(item.items), json.dumps(item.narrative_rewards), json.dumps(item.context_reasons),
+                           item.created_at, int(item.claimed), item.claimed_at))
             for item in package.lore_entries:
                 db.execute("INSERT INTO lore_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (item.id, c.id, item.layer, item.category, item.title, item.content, item.source_id, item.location_id, item.created_at))
             for item in package.hex_cells:
@@ -488,11 +498,11 @@ class SQLiteRepository:
                 for item in combat.combatants:
                     db.execute("""INSERT INTO combatants(id,combat_id,name,kind,initiative,armor_class,max_hp,current_hp,temp_hp,
                                initiative_bonus,concentration,reaction_available,legendary_actions,legendary_actions_max,notes,
-                               conditions,actions,source_id,reference_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                               conditions,actions,source_id,reference_id,character_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                                (item.id, combat.id, item.name, item.kind, item.initiative, item.armor_class, item.max_hp,
                                 item.current_hp, item.temp_hp, item.initiative_bonus, int(item.concentration),
                                 int(item.reaction_available), item.legendary_actions, item.legendary_actions_max, item.notes,
-                                json.dumps(item.conditions), json.dumps(item.actions), item.source_id, item.reference_id))
+                                json.dumps(item.conditions), json.dumps(item.actions), item.source_id, item.reference_id, item.character_id))
             if package.hexcrawl_settings:
                 item = package.hexcrawl_settings
                 db.execute("INSERT INTO hexcrawl_settings VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (c.id, int(item.track_weather), int(item.track_navigation), int(item.track_food), int(item.track_water), int(item.track_fatigue), int(item.track_encounters), int(item.track_foraging), int(item.auto_discover), item.default_pace, item.hex_distance, item.distance_unit))
@@ -500,7 +510,7 @@ class SQLiteRepository:
                 db.execute("INSERT INTO hexcrawl_settings(campaign_id) VALUES (?)", (c.id,))
             if package.player_view_settings:
                 item = package.player_view_settings
-                db.execute("INSERT INTO player_view_settings VALUES (?,?,?,?,?,?,?,?)", (c.id, int(item.enabled), int(item.show_map), int(item.show_rumors), int(item.show_resources), int(item.show_weather), int(item.show_combat), int(item.show_enemy_hp)))
+                db.execute("INSERT INTO player_view_settings VALUES (?,?,?,?,?,?,?,?,?,?)", (c.id, int(item.enabled), int(item.show_map), int(item.show_rumors), int(item.show_resources), int(item.show_weather), int(item.show_combat), int(item.show_enemy_hp), int(item.show_characters), int(item.show_inventory)))
             else:
                 db.execute("INSERT INTO player_view_settings(campaign_id) VALUES (?)", (c.id,))
             if package.expedition_state:
@@ -515,4 +525,22 @@ class SQLiteRepository:
                            item.distance_unit, item.weather, item.navigation_roll, item.encounter_roll, item.food_used, item.water_used,
                            item.exhaustion_delta, int(item.encounter_triggered), item.encounter_id,
                            int(item.reached_destination), json.dumps(item.notes), item.created_at))
+            for item in package.characters:
+                values = item.model_dump()
+                for key in ("ability_scores", "saving_throws", "skills", "conditions", "spell_slots", "spell_slots_max", "resources"):
+                    values[key] = json.dumps(values[key])
+                values["campaign_id"] = c.id
+                db.execute(f"INSERT INTO characters({','.join(values)}) VALUES ({','.join('?' for _ in values)})", tuple(values.values()))
+            for item in package.inventory:
+                values = item.model_dump(); values["campaign_id"] = c.id
+                db.execute(f"INSERT INTO inventory_items({','.join(values)}) VALUES ({','.join('?' for _ in values)})", tuple(values.values()))
+            treasury = package.treasury
+            if treasury:
+                db.execute("INSERT INTO treasury VALUES (?,?,?,?,?,?,?)", (c.id, treasury.cp, treasury.sp, treasury.ep, treasury.gp, treasury.pp, treasury.updated_at))
+            else:
+                db.execute("INSERT INTO treasury(campaign_id,updated_at) VALUES (?,datetime('now'))", (c.id,))
+            for item in package.inventory_transactions:
+                db.execute("INSERT INTO inventory_transactions VALUES (?,?,?,?,?,?,?,?,?,?)", (item.id, c.id, item.kind,
+                           item.description, item.item_id, item.character_id, item.currency, item.currency_delta,
+                           item.quantity_delta, item.created_at))
         return self.get_campaign(c.id)  # type: ignore[return-value]

@@ -337,6 +337,61 @@ class APITests(unittest.TestCase):
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.json()["license"], "CC-BY-4.0")
 
+    def test_party_inventory_treasury_reward_and_combat_sync(self):
+        dashboard = self.client.get("/api/campaigns/demo").json()
+        self.assertEqual(len(dashboard["characters"]), 3)
+        character = self.client.post("/api/characters", json={
+            "campaign_id": "demo", "name": "Test Hero", "class_name": "Bard",
+            "level": 4, "armor_class": 15, "max_hp": 30,
+            "resources": [{"name": "Inspiracio", "current": 0, "maximum": 1, "reset": "long"}],
+        })
+        self.assertEqual(character.status_code, 201)
+        character_id = character.json()["id"]
+        item = self.client.post("/api/inventory", json={
+            "campaign_id": "demo", "owner_type": "character", "owner_id": character_id,
+            "name": "Pocio de prova", "category": "consumable", "quantity": 2, "consumable": True,
+        })
+        self.assertEqual(item.status_code, 201)
+        consumed = self.client.post(f"/api/inventory/{item.json()['id']}/consume", json={"quantity": 1})
+        self.assertEqual(consumed.json()["item"]["quantity"], 1)
+        adjusted = self.client.post("/api/campaigns/demo/treasury/adjust", json={
+            "currency": "gp", "amount": 25, "description": "Venda",
+        })
+        self.assertEqual(adjusted.json()["gp"], 150)
+
+        reward = self.client.post("/api/rewards/generate", json={
+            "campaign_id": "demo", "terrain": "jungle", "party_level": 4, "difficulty": 3,
+        }).json()
+        claimed = self.client.post(f"/api/rewards/{reward['id']}/claim", json={"owner_type": "party"})
+        self.assertEqual(claimed.status_code, 200)
+        self.assertTrue(claimed.json()["reward"]["claimed"])
+        self.assertEqual(self.client.post(f"/api/rewards/{reward['id']}/claim", json={}).status_code, 409)
+
+        combat = self.client.post("/api/combats", json={"campaign_id": "demo", "name": "Prova"}).json()
+        linked = self.client.post(f"/api/combats/{combat['id']}/characters", json={
+            "character_ids": [character_id], "roll_initiative": False,
+        })
+        self.assertEqual(linked.status_code, 201)
+        combatant = linked.json()["combatants"][0]
+        self.assertEqual(combatant["character_id"], character_id)
+        self.client.patch(f"/api/combatants/{combatant['id']}", json={"current_hp": 7, "conditions": ["poisoned"]})
+        updated = next(x for x in self.client.get("/api/characters?campaign_id=demo").json() if x["id"] == character_id)
+        self.assertEqual(updated["current_hp"], 7)
+        self.assertEqual(updated["conditions"], ["poisoned"])
+        rested = self.client.post("/api/campaigns/demo/rest", json={
+            "rest_type": "long", "consume_resources": False, "safe_camp": True,
+        })
+        self.assertIn("Test Hero", rested.json()["characters_recovered"])
+        refreshed = next(x for x in self.client.get("/api/characters?campaign_id=demo").json() if x["id"] == character_id)
+        self.assertEqual(refreshed["current_hp"], 30)
+        self.assertEqual(refreshed["resources"][0]["current"], 1)
+        combat_after_rest = next(x for x in self.client.get("/api/combats?campaign_id=demo").json() if x["id"] == combat["id"])
+        linked_after_rest = next(x for x in combat_after_rest["combatants"] if x["character_id"] == character_id)
+        self.assertEqual(linked_after_rest["current_hp"], 30)
+        player = self.client.get("/api/player-view/demo").json()
+        self.assertTrue(any(x["id"] == character_id for x in player["characters"]))
+        self.assertIsNotNone(player["treasury"])
+
 
 if __name__ == "__main__":
     unittest.main()

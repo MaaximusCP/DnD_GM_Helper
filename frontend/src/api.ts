@@ -4,6 +4,7 @@ import type {
   ReferenceItem, ReferenceSearch,
   Combat, Combatant, CombatLog, ExpeditionState, HexCell, HexcrawlSettings, LoreEntry, LoreLayer,
   ExpeditionRestResult, PlayerView, PlayerViewSettings, TravelLog,
+  Character, InventoryItem, Treasury, InventoryTransaction,
 } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000/api' : '/api')
@@ -49,6 +50,7 @@ export const api = {
   addKnowledge: (npcId: string, content: string) => request<Knowledge>(`/npcs/${npcId}/knowledge`, { method:'POST', body:JSON.stringify({subject:'Nota del DM',content,confidence:1,truth_status:'fact',source_type:'manual'}) }),
   generateEncounter: (campaignId:string, payload: Record<string, unknown>) => request<Encounter>('/encounters/generate', { method:'POST', body:JSON.stringify({campaign_id:campaignId,...payload}) }),
   generateReward: (campaignId:string, payload: Record<string, unknown>) => request<Reward>('/rewards/generate', { method:'POST', body:JSON.stringify({campaign_id:campaignId,...payload}) }),
+  claimReward: (id:string,ownerType:'party'|'character'|'location'='party',ownerId?:string) => request<{reward:Reward;items:InventoryItem[];treasury:Treasury}>(`/rewards/${id}/claim`,{method:'POST',body:JSON.stringify({owner_type:ownerType,owner_id:ownerId||null})}),
   chat: (npcId: string, message: string) => request<{ reply: string; context_reasons: string[]; provider: string }>(`/npcs/${npcId}/chat`, { method: 'POST', body: JSON.stringify({ message, situation: 'Conversa durant la sessió', history: [] }) }),
   createLocation: (campaignId:string,payload:{name:string;description:string;terrain:string}) => request<Location>(`/campaigns/${campaignId}/locations`,{method:'POST',body:JSON.stringify(payload)}),
   updateLocation: (id:string,payload:Partial<Location>) => request<Location>(`/locations/${id}`,{method:'PATCH',body:JSON.stringify(payload)}),
@@ -96,4 +98,15 @@ export const api = {
   rollInitiative: (id:string,automatic=true,rolls:Record<string,number>={}) => request<Combat>(`/combats/${id}/initiative`,{method:'POST',body:JSON.stringify({automatic,rolls})}),
   combatLog: (id:string) => request<CombatLog[]>(`/combats/${id}/log`),
   combatRoll: (id:string,notation:string,label:string,combatantId?:string) => request<{notation:string;dice:number[];modifier:number;total:number;label:string}>(`/combats/${id}/roll`,{method:'POST',body:JSON.stringify({notation,label,combatant_id:combatantId||null})}),
+  createCharacter: (campaignId:string,payload:Record<string,unknown>) => request<Character>('/characters',{method:'POST',body:JSON.stringify({campaign_id:campaignId,...payload})}),
+  updateCharacter: (id:string,payload:Partial<Character>) => request<Character>(`/characters/${id}`,{method:'PATCH',body:JSON.stringify(payload)}),
+  deleteCharacter: (id:string) => request<void>(`/characters/${id}?confirm=true`,{method:'DELETE'}),
+  createInventory: (campaignId:string,payload:Record<string,unknown>) => request<InventoryItem>('/inventory',{method:'POST',body:JSON.stringify({campaign_id:campaignId,...payload})}),
+  updateInventory: (id:string,payload:Partial<InventoryItem>) => request<InventoryItem>(`/inventory/${id}`,{method:'PATCH',body:JSON.stringify(payload)}),
+  consumeInventory: (id:string,quantity:number) => request<{item:InventoryItem|null}>(`/inventory/${id}/consume`,{method:'POST',body:JSON.stringify({quantity,description:'Consum durant la sessió'})}),
+  deleteInventory: (id:string) => request<void>(`/inventory/${id}?confirm=true`,{method:'DELETE'}),
+  updateTreasury: (campaignId:string,payload:Partial<Treasury>) => request<Treasury>(`/campaigns/${campaignId}/treasury`,{method:'PATCH',body:JSON.stringify(payload)}),
+  adjustTreasury: (campaignId:string,currency:string,amount:number,description:string) => request<Treasury>(`/campaigns/${campaignId}/treasury/adjust`,{method:'POST',body:JSON.stringify({currency,amount,description})}),
+  inventoryTransactions: (campaignId:string) => request<InventoryTransaction[]>(`/campaigns/${campaignId}/inventory-transactions`),
+  addCharactersToCombat: (combatId:string,characterIds:string[]=[]) => request<Combat>(`/combats/${combatId}/characters`,{method:'POST',body:JSON.stringify({character_ids:characterIds,roll_initiative:true})}),
 }

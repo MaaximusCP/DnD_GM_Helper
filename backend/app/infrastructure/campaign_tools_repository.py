@@ -230,11 +230,11 @@ class CampaignToolsRepository:
         with self.database.connect() as db:
             db.execute("""INSERT INTO combatants(id,combat_id,name,kind,initiative,armor_class,max_hp,current_hp,temp_hp,
                        initiative_bonus,concentration,reaction_available,legendary_actions,legendary_actions_max,notes,
-                       conditions,actions,source_id,reference_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                       conditions,actions,source_id,reference_id,character_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                 item.id, item.combat_id, item.name, item.kind, item.initiative, item.armor_class,
                 item.max_hp, item.current_hp, item.temp_hp, item.initiative_bonus, int(item.concentration),
                 int(item.reaction_available), item.legendary_actions, item.legendary_actions_max, item.notes,
-                json.dumps(item.conditions), json.dumps(item.actions), item.source_id, item.reference_id,
+                json.dumps(item.conditions), json.dumps(item.actions), item.source_id, item.reference_id, item.character_id,
             ))
         self.add_combat_log(combat_id, f"{item.name} entra al combat")
         return item
@@ -247,6 +247,12 @@ class CampaignToolsRepository:
             values["actions"] = json.dumps(values["actions"])
         with self.database.connect() as db:
             row = db.execute("SELECT * FROM combatants WHERE id=?", (item_id,)).fetchone()
+            if row["character_id"]:
+                sync = {key: values[key] for key in ("current_hp", "max_hp", "temp_hp", "conditions") if key in values}
+                if "conditions" in sync and isinstance(sync["conditions"], list):
+                    sync["conditions"] = json.dumps(sync["conditions"])
+                if sync:
+                    db.execute(f"UPDATE characters SET {','.join(f'{key}=?' for key in sync)} WHERE id=?", (*sync.values(), row["character_id"]))
             if not row:
                 return None
             previous_hp = row["current_hp"]

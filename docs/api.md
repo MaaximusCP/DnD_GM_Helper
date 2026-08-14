@@ -74,6 +74,16 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `POST` | `/encounters/{id}/combat` | Prepara un combat amb adversaris SRD a partir de l'encounter |
 | `GET` | `/rewards` | Historial de recompenses |
 | `POST` | `/rewards/generate` | Genera i desa una recompensa contextual |
+| `POST` | `/rewards/{id}/claim` | Converteix una recompensa en inventari i tresoreria, una sola vegada |
+| `GET/POST` | `/characters` | Llista o crea personatges jugadors persistents |
+| `PATCH/DELETE` | `/characters/{id}` | Actualitza o elimina un personatge i reassigna el seu equip |
+| `GET/POST` | `/inventory` | Llista o crea equip compartit, individual o vinculat a una ubicació |
+| `PATCH/DELETE` | `/inventory/{id}` | Transfereix, edita o elimina un objecte |
+| `POST` | `/inventory/{id}/consume` | Consumeix una quantitat i registra el moviment |
+| `GET/PATCH` | `/campaigns/{id}/treasury` | Consulta o fixa la tresoreria multimoneda |
+| `POST` | `/campaigns/{id}/treasury/adjust` | Registra un ingrés o una despesa auditada |
+| `GET` | `/campaigns/{id}/inventory-transactions` | Historial d'inventari i tresoreria |
+| `POST` | `/combats/{id}/characters` | Afegeix personatges al combat amb PG i condicions sincronitzats |
 | `GET` | `/reference/meta` | Versió, llicència i recompte del catàleg SRD local |
 | `GET` | `/reference?category=...&q=...` | Cerca paginada al catàleg SRD |
 | `GET` | `/reference/item/{id}` | Fitxa estructurada completa d'una entrada SRD |
