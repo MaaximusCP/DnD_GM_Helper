@@ -1,21 +1,23 @@
 from pathlib import Path
-import re
 import secrets
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse
 
 from app.application.context_builder import ContextBuilder
+from app.application.campaign_template_service import CampaignTemplateService
 from app.application.event_service import EventService
 from app.application.backup_service import BackupService
 from app.application.document_service import DocumentService
+from app.application.dice_service import DiceService
 from app.application.generation_service import GenerationService
+from app.application.npc_action_service import NPCActionService
 from app.application.rumor_service import RumorService
 from app.application.rest_service import RestService
 from app.application.travel_service import TravelService
 from app.config import Settings, get_settings
 from app.domain.models import (
-    CampaignBundle, CampaignCreate, CampaignUpdate, EventAnalyzeRequest, EventProposal,
+    CampaignBundle, CampaignCreate, CampaignTemplateCreate, CampaignUpdate, EventAnalyzeRequest, EventProposal,
     EventUpdate, FactionCreate, FactionUpdate, LocationCreate, LocationUpdate,
     MemoryCreate, NPCCreate, NPCChatRequest,
     NPCChatResponse, NPCUpdate, SessionEndRequest,
@@ -25,14 +27,15 @@ from app.domain.models import (
     CombatCreate, CombatUpdate, CombatantCreate, CombatantUpdate,
     ReferenceCombatantCreate,
     HexCellCreate, HexCellUpdate, LoreEntryCreate, LoreEntryUpdate,
-    CombatantDuplicate, CombatRollRequest, InitiativeRequest,
+    CombatantDuplicate, CombatRollRequest, DiceRollRequest, InitiativeRequest,
     EncounterCombatRequest, ExpeditionRestRequest, ExpeditionStateUpdate, HexcrawlSettingsUpdate,
     HexRevealRequest, PlayerViewSettingsUpdate, TravelRequest,
     CharacterCreate, CharacterUpdate, CharacterCombatRequest,
     InventoryItemCreate, InventoryItemUpdate, InventoryConsume,
     TreasuryUpdate, TreasuryAdjustment, RewardClaimRequest,
     CampaignRecordCreate, CampaignRecordUpdate, CampaignActivityCreate,
-    EncounterResolution, SessionCloseRequest,
+    EncounterResolution, SessionCloseRequest, ContentSourceUpdate, DocumentLoreRequest,
+    NPCActionRequest, NPCActionResult,
 )
 from app.infrastructure.campaign_tools_repository import CampaignToolsRepository
 from app.infrastructure.content_repository import ContentRepository
@@ -103,6 +106,19 @@ def list_campaigns(repository: SQLiteRepository = Depends(get_repository)):
 @router.post("/campaigns", status_code=status.HTTP_201_CREATED)
 def create_campaign(payload: CampaignCreate, repository: SQLiteRepository = Depends(get_repository)):
     return repository.create_campaign(payload)
+
+
+@router.get("/campaign-templates")
+def list_campaign_templates():
+    return CampaignTemplateService.list_templates()
+
+
+@router.post("/campaign-templates/create", status_code=status.HTTP_201_CREATED)
+def create_from_template(payload: CampaignTemplateCreate,
+                         repository: SQLiteRepository = Depends(get_repository),
+                         tools: CampaignToolsRepository = Depends(get_campaign_tools_repository),
+                         operations: OperationsRepository = Depends(get_operations_repository)):
+    return CampaignTemplateService(repository, tools, operations).create(payload)
 
 
 @router.get("/campaigns/{campaign_id}")
@@ -435,6 +451,15 @@ async def chat_with_npc(
     return NPCChatResponse(npc_id=npc_id, reply=reply, context_reasons=reasons, provider=provider.name)
 
 
+@router.post("/campaigns/{campaign_id}/npc-actions", response_model=NPCActionResult, status_code=status.HTTP_201_CREATED)
+def generate_npc_actions(campaign_id: str, payload: NPCActionRequest,
+                         repository: SQLiteRepository = Depends(get_repository)):
+    try:
+        return NPCActionService(repository).generate(campaign_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.post("/events/analyze", response_model=EventProposal, status_code=status.HTTP_201_CREATED)
 def analyze_event(payload: EventAnalyzeRequest, repository: SQLiteRepository = Depends(get_repository)):
     if not repository.get_campaign(payload.campaign_id):
@@ -551,20 +576,87 @@ def get_reference_item(item_id: str):
     return item
 
 
+@router.get("/campaigns/{campaign_id}/dice-rolls")
+def list_dice_rolls(campaign_id: str, limit: int = 50,
+                    repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=422, detail="El límit ha d'estar entre 1 i 200")
+    return repository.list_dice_rolls(campaign_id, limit)
+
+
+@router.post("/campaigns/{campaign_id}/dice-rolls", status_code=status.HTTP_201_CREATED)
+def create_dice_roll(campaign_id: str, payload: DiceRollRequest,
+                     campaign_repository: SQLiteRepository = Depends(get_repository),
+                     repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if not campaign_repository.get_campaign(campaign_id):
+        raise HTTPException(status_code=404, detail="Campanya no trobada")
+    try:
+        result = DiceService.roll(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return repository.add_dice_roll(campaign_id, payload, result)
+
+
+@router.delete("/campaigns/{campaign_id}/dice-rolls")
+def clear_dice_rolls(campaign_id: str, confirm: bool = False,
+                     repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Cal confirmar l'eliminació de l'historial")
+    return {"deleted": repository.clear_dice_rolls(campaign_id)}
+
+
 @router.get("/library")
 def list_library(campaign_id: str = "demo", repository: ContentRepository = Depends(get_content_repository)):
     return repository.list_sources(campaign_id)
 
 
 @router.get("/library/{source_id}/asset", response_model=None)
-def library_asset(source_id: str, repository: ContentRepository = Depends(get_content_repository)):
+def library_asset(source_id: str, settings: Settings = Depends(get_settings),
+                  repository: ContentRepository = Depends(get_content_repository)):
     source = repository.get_source(source_id)
     if not source:
         raise HTTPException(status_code=404, detail="Font no trobada")
-    path = Path(source.file_path).resolve()
-    if not path.is_file():
+    library_root = settings.library_path.resolve()
+    path = (library_root / source.file_path).resolve()
+    if library_root not in path.parents or not path.is_file():
         raise HTTPException(status_code=404, detail="Fitxer no disponible")
     return FileResponse(path, media_type=source.mime_type, filename=source.file_name)
+
+
+@router.patch("/library/{source_id}")
+def update_library_source(source_id: str, payload: ContentSourceUpdate,
+                          repository: ContentRepository = Depends(get_content_repository)):
+    source = repository.update_source(source_id, payload)
+    if not source:
+        raise HTTPException(status_code=404, detail="Font no trobada")
+    return source
+
+
+@router.get("/library/{source_id}/chunks")
+def list_library_chunks(source_id: str, offset: int = 0, limit: int = 50,
+                        repository: ContentRepository = Depends(get_content_repository)):
+    if offset < 0 or limit < 1 or limit > 100:
+        raise HTTPException(status_code=422, detail="Paginació no vàlida")
+    if not repository.get_source(source_id):
+        raise HTTPException(status_code=404, detail="Font no trobada")
+    return repository.list_chunks(source_id, offset, limit)
+
+
+@router.post("/campaigns/{campaign_id}/library/lore", status_code=status.HTTP_201_CREATED)
+def create_lore_from_document(campaign_id: str, payload: DocumentLoreRequest,
+                              content: ContentRepository = Depends(get_content_repository),
+                              tools: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
+    found = content.get_chunk(payload.chunk_id)
+    if not found or found[1].campaign_id != campaign_id:
+        raise HTTPException(status_code=404, detail="Fragment no trobat en aquesta campanya")
+    chunk, source = found
+    text = (payload.content or chunk.text).strip()
+    if len(text) < 2:
+        raise HTTPException(status_code=422, detail="El fragment no conté prou text")
+    return tools.create_lore(LoreEntryCreate(
+        campaign_id=campaign_id, layer=payload.layer, category=payload.category,
+        title=payload.title, content=text, source_id=source.id, source_page=chunk.page, location_id=payload.location_id,
+    ))
 
 
 @router.get("/library/search")
@@ -771,7 +863,7 @@ def update_player_view_settings(campaign_id: str, payload: PlayerViewSettingsUpd
 
 
 @router.get("/player-view/{campaign_id}")
-def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_repository), repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), simulation: SimulationRepository = Depends(get_simulation_repository), party_repo: PartyRepository = Depends(get_party_repository), operations: OperationsRepository = Depends(get_operations_repository)):
+def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_repository), repository: CampaignToolsRepository = Depends(get_campaign_tools_repository), simulation: SimulationRepository = Depends(get_simulation_repository), party_repo: PartyRepository = Depends(get_party_repository), operations: OperationsRepository = Depends(get_operations_repository), content: ContentRepository = Depends(get_content_repository)):
     campaign = world.get_campaign(campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campanya no trobada")
@@ -820,6 +912,8 @@ def player_view(campaign_id: str, world: SQLiteRepository = Depends(get_reposito
         "inventory": [item.model_dump() for item in party_repo.list_inventory(campaign_id, "party")]
                      if settings.show_inventory else [],
         "treasury": party_repo.get_treasury(campaign_id).model_dump() if settings.show_inventory else None,
+        "sources": [item.model_dump(exclude={"file_path", "checksum"}) for item in content.list_sources(campaign_id)
+                    if item.visibility == "players"] if settings.show_library else [],
         "quests": [item.model_dump() for item in operations.list_records(campaign_id, "quest") if item.visibility == "players"],
         "calendar": [item.model_dump() for item in operations.list_records(campaign_id, "calendar") if item.visibility == "players"],
         "markers": [item.model_dump() for item in public_markers],
@@ -1057,17 +1151,13 @@ def get_combat_log(combat_id: str, repository: CampaignToolsRepository = Depends
 def combat_roll(combat_id: str, payload: CombatRollRequest, repository: CampaignToolsRepository = Depends(get_campaign_tools_repository)):
     if not repository.get_combat(combat_id):
         raise HTTPException(status_code=404, detail="Combat no trobat")
-    match = re.fullmatch(r"(\d{1,2})d(\d{1,3})([+-]\d{1,4})?", payload.notation.replace(" ", "").lower())
-    if not match:
-        raise HTTPException(status_code=422, detail="Notació no vàlida; utilitza per exemple 1d20+5")
-    count, sides, modifier = int(match.group(1)), int(match.group(2)), int(match.group(3) or 0)
-    if count > 20 or sides > 100 or sides < 2:
-        raise HTTPException(status_code=422, detail="La tirada supera els límits permesos")
-    dice = [secrets.randbelow(sides) + 1 for _ in range(count)]
-    total = sum(dice) + modifier
-    message = f"{payload.label}: {payload.notation} = {total} ({dice}{modifier:+d})"
+    try:
+        result = DiceService.roll(DiceRollRequest(notation=payload.notation, label=payload.label))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    message = f"{payload.label}: {result['notation']} = {result['total']} ({result['dice']}{result['modifier']:+d})"
     repository.add_combat_log(combat_id, message, "roll")
-    return {"notation": payload.notation, "dice": dice, "modifier": modifier, "total": total, "label": payload.label}
+    return {**result, "label": payload.label}
 
 
 @router.get("/generation-tables")

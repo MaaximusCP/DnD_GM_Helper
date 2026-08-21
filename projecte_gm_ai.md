@@ -1969,11 +1969,13 @@ Objectiu: validar l'experiència real del DM des del primer moment.
 ## Versió 1.0 — Motor de campanyes
 
 - múltiples campanyes;
-- plantilles;
+- plantilles locals en blanc, expedició selvàtica, intriga urbana i dungeon;
 - Tomb of Annihilation com a primera campanya funcional;
 - suport senzill per afegir una altra campanya D&D 5e;
 - experiència local estable;
 - cloud completament opcional.
+- NPC actius amb autonomia configurable i accions entre sessions pendents d'aprovació;
+- flux documental revisable que converteix fragments amb font i pàgina en coneixement canònic.
 
 ---
 
@@ -2321,3 +2323,18 @@ EventProcessor
 ```
 
 Una vegada aquesta vertical slice sigui usable durant una sessió, es pot ampliar gradualment amb rumors, NPCs actius, encounters, rewards i finalment sincronització opcional amb Azure.
+
+---
+
+# 46. Estat implementat: versió 1.1 local-first
+
+La vertical slice i els mòduls locals previstos fins a la versió 1.1 ja estan implementats. A més dels motors de campanya, biblioteca, hexcrawl, combat, operacions, NPC actius i pantalla de jugadors, la versió 1.1 incorpora:
+
+- safata de daus persistent per campanya;
+- notació limitada i validada, modificadors i CD;
+- avantatge i desavantatge per a tirades d'un d20;
+- historial SQLite independent del registre de combat;
+- 15 condicions de l'SRD 5.1 integrades al catàleg local;
+- panell de consulta de condicions pensat per a l'ús durant la sessió.
+
+La sincronització cloud, l'OCR i la cerca semàntica continuen sent extensions opcionals. El nucli 1.1 no les necessita.

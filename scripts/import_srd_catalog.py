@@ -17,7 +17,7 @@ from typing import Any
 
 
 BASE_URL = "https://www.dnd5eapi.co/api/2014"
-CATEGORIES = ("magic-items", "equipment", "monsters", "spells")
+CATEGORIES = ("magic-items", "equipment", "monsters", "spells", "conditions")
 ATTRIBUTION = (
     "This work includes material taken from the System Reference Document 5.1 "
     '(“SRD 5.1”) by Wizards of the Coast LLC and available at '

@@ -4,7 +4,7 @@ El botó de controls de la capçalera obre un panell lateral de preferències. E
 
 ## Visibilitat
 
-Es poden mostrar o ocultar independentment Món, Pantalla de jugadors, Coneixement, Hexcrawl, Combat, Faccions, Biblioteca, Catàleg SRD, Taules custom, Encounter Engine i Reward Engine.
+Es poden mostrar o ocultar independentment Eines de taula, Món, Pantalla de jugadors, Coneixement, Hexcrawl, Combat, Faccions, Biblioteca, Catàleg SRD, Taules custom, Encounter Engine i Reward Engine.
 
 La vista **Sessió** sempre es manté activa perquè el DM no es pugui quedar sense navegació. Si s'oculta el mòdul que estava obert, l'aplicació torna automàticament a Sessió. Ocultar un mòdul no elimina cap dada ni desactiva els seus endpoints.
 

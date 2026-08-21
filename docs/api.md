@@ -1,4 +1,4 @@
-# API local 0.7
+# API local 1.1
 
 Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interactiva completa a `/docs`.
 
@@ -8,6 +8,8 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `GET` | `/campaigns` | Campanyes disponibles |
 | `GET` | `/campaigns/{id}` | Dashboard agregat de la campanya |
 | `POST` | `/campaigns` | Crea una campanya i la seva localització inicial |
+| `GET` | `/campaign-templates` | Llista les plantilles locals disponibles |
+| `POST` | `/campaign-templates/create` | Crea una campanya completa des d'una plantilla |
 | `PATCH` | `/campaigns/{id}` | Edita nom, dia, regles o localització actual |
 | `GET` | `/campaigns/{id}/export` | Exporta un paquet JSON portable |
 | `POST` | `/campaigns/import` | Importa un paquet JSON; mai sobreescriu un ID existent |
@@ -27,6 +29,7 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `DELETE` | `/npcs/{id}` | Elimina un NPC després de confirmació a la UI |
 | `POST` | `/npcs/{id}/memories` | Afegeix una memòria manual |
 | `POST` | `/npcs/{id}/chat` | Resposta contextual de l'NPC |
+| `POST` | `/campaigns/{id}/npc-actions` | Genera accions de downtime pendents i pot avançar el calendari |
 | `POST` | `/events/analyze` | Crea una proposta pendent |
 | `PATCH` | `/events/{id}` | Edita una proposta pendent |
 | `POST` | `/events/{id}/apply` | Aplica una proposta en transacció |
@@ -39,6 +42,10 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `GET` | `/library?campaign_id=demo` | Fonts locals de la campanya |
 | `POST` | `/library/upload` | Carrega i indexa un document o mapa amb `multipart/form-data` |
 | `GET` | `/library/search?q=...` | Cerca textual amb font i pàgina |
+| `GET` | `/library/{id}/asset` | Obre el document o mapa des de la biblioteca local |
+| `PATCH` | `/library/{id}` | Edita títol o visibilitat de la font |
+| `GET` | `/library/{id}/chunks` | Consulta fragments paginats d'una font |
+| `POST` | `/campaigns/{id}/library/lore` | Aprova un fragment i el converteix en lore amb procedència |
 | `DELETE` | `/library/{id}?confirm=true` | Elimina metadades, fragments i fitxer local |
 | `GET/POST` | `/npcs/{id}/knowledge` | Consulta o afegeix coneixement diferenciat |
 | `GET/POST` | `/rumors` | Consulta o crea rumors |
@@ -65,6 +72,9 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `POST` | `/combats/{id}/initiative` | Calcula iniciativa automàtica o aplica tirades manuals |
 | `GET` | `/combats/{id}/log` | Historial persistent del combat |
 | `POST` | `/combats/{id}/roll` | Resol una notació limitada com `2d6+3` i la registra |
+| `GET` | `/campaigns/{id}/dice-rolls` | Consulta les darreres tirades de la campanya |
+| `POST` | `/campaigns/{id}/dice-rolls` | Tira daus amb CD i mode normal, avantatge o desavantatge |
+| `DELETE` | `/campaigns/{id}/dice-rolls?confirm=true` | Buida l'historial de tirades de la campanya |
 | `GET/POST` | `/generation-tables` | Llista o crea taules homebrew |
 | `PATCH/DELETE` | `/generation-tables/{id}` | Edita o elimina una taula i les entrades associades |
 | `GET/POST` | `/generation-tables/{id}/entries` | Llista o afegeix opcions contextuals |

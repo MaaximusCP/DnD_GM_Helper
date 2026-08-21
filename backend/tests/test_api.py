@@ -86,7 +86,22 @@ class APITests(unittest.TestCase):
             "campaign_id": "demo", "title": "Notes locals", "source_type": "notes", "visibility": "dm",
         }, files={"file": ("notes.md", b"La Kara coneix el mercat secret.", "text/markdown")})
         self.assertEqual(uploaded.status_code, 201)
-        self.assertEqual(self.client.get("/api/library/search", params={"campaign_id":"demo", "q":"mercat secret"}).status_code, 200)
+        search = self.client.get("/api/library/search", params={"campaign_id":"demo", "q":"mercat secret"})
+        self.assertEqual(search.status_code, 200)
+        chunk_id = search.json()[0]["chunk_id"]
+        lore = self.client.post("/api/campaigns/demo/library/lore", json={
+            "chunk_id": chunk_id, "layer": "dm", "category": "location", "title": "Mercat secret",
+        })
+        self.assertEqual(lore.status_code, 201)
+        self.assertEqual(lore.json()["source_id"], uploaded.json()["id"])
+        patched = self.client.patch(f"/api/library/{uploaded.json()['id']}", json={"visibility":"players"})
+        self.assertEqual(patched.json()["visibility"], "players")
+        asset = self.client.get(f"/api/library/{uploaded.json()['id']}/asset")
+        self.assertEqual(asset.status_code, 200)
+        player_sources = self.client.get("/api/player-view/demo").json()["sources"]
+        self.assertEqual(player_sources[0]["id"], uploaded.json()["id"])
+        self.assertNotIn("file_path", player_sources[0])
+        self.assertNotIn("checksum", player_sources[0])
         knowledge = self.client.post("/api/npcs/kara/knowledge", json={
             "subject":"Mercat", "content":"Coneix el mercat secret", "confidence":1,
             "truth_status":"fact", "source_type":"manual",
@@ -442,6 +457,63 @@ class APITests(unittest.TestCase):
         self.assertEqual(closed.status_code, 200)
         self.assertIn("Resum autom", closed.json()["summary"])
         self.assertGreaterEqual(len(closed.json()["activities"]), 2)
+
+
+    def test_v1_templates_and_reviewable_npc_downtime(self):
+        templates = self.client.get("/api/campaign-templates")
+        self.assertEqual(templates.status_code, 200)
+        self.assertEqual(len(templates.json()), 4)
+        created = self.client.post("/api/campaign-templates/create", json={
+            "template_id": "urban_intrigue", "name": "Ombres de la ciutat",
+        })
+        self.assertEqual(created.status_code, 201)
+        campaign_id = created.json()["id"]
+        dashboard = self.client.get(f"/api/campaigns/{campaign_id}").json()
+        self.assertGreaterEqual(len(dashboard["locations"]), 3)
+        self.assertEqual(len([npc for npc in dashboard["npcs"] if npc["active"]]), 2)
+        self.assertGreaterEqual(len(dashboard["hex_cells"]), 5)
+
+        day_before = dashboard["campaign"]["current_day"]
+        result = self.client.post(f"/api/campaigns/{campaign_id}/npc-actions", json={
+            "days": 3, "advance_calendar": True,
+        })
+        self.assertEqual(result.status_code, 201)
+        self.assertEqual(result.json()["current_day"], day_before + 3)
+        self.assertEqual(len(result.json()["proposals"]), 2)
+        self.assertTrue(all(item["status"] == "pending" for item in result.json()["proposals"]))
+        npc = dashboard["npcs"][0]
+        before_memories = len(npc["memories"])
+        proposal = result.json()["proposals"][0]
+        self.assertEqual(self.client.post(f"/api/events/{proposal['id']}/apply").status_code, 200)
+        affected = self.client.get(f"/api/npcs/{proposal['consequences'][0]['target_id']}").json()
+        self.assertGreaterEqual(len(affected["memories"]), before_memories)
+
+    def test_v1_session_dice_tray_and_srd_conditions(self):
+        rolled = self.client.post("/api/campaigns/demo/dice-rolls", json={
+            "notation": "1d20+5", "label": "Percepció", "actor": "Aria",
+            "mode": "advantage", "dc": 12,
+        })
+        self.assertEqual(rolled.status_code, 201)
+        result = rolled.json()
+        self.assertEqual(len(result["dice"]), 2)
+        self.assertEqual(result["kept"], [max(result["dice"])])
+        self.assertEqual(result["total"], result["kept"][0] + 5)
+        self.assertEqual(result["success"], result["total"] >= 12)
+        self.assertEqual(len(self.client.get("/api/campaigns/demo/dice-rolls").json()), 1)
+        exported = self.client.get("/api/campaigns/demo/export")
+        self.assertEqual(exported.status_code, 200)
+        self.assertEqual(exported.json()["dice_rolls"][0]["id"], result["id"])
+        invalid = self.client.post("/api/campaigns/demo/dice-rolls", json={
+            "notation": "2d6", "label": "Dany", "mode": "advantage",
+        })
+        self.assertEqual(invalid.status_code, 422)
+        cleared = self.client.delete("/api/campaigns/demo/dice-rolls?confirm=true")
+        self.assertEqual(cleared.json()["deleted"], 1)
+
+        conditions = self.client.get("/api/reference", params={"category": "conditions", "limit": 100})
+        self.assertEqual(conditions.status_code, 200)
+        self.assertGreaterEqual(conditions.json()["total"], 15)
+        self.assertTrue(any(item["key"] == "poisoned" for item in conditions.json()["items"]))
 
 
 if __name__ == "__main__":

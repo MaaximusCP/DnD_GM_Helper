@@ -156,6 +156,7 @@ class SQLiteRepository:
                 location_id=row["location_id"], faction_id=row["faction_id"],
                 traits=json.loads(row["traits"]), goals=json.loads(row["goals"]),
                 values=json.loads(row["values_json"]), secrets=json.loads(row["secrets"]),
+                active=bool(row["active"]), autonomy=row["autonomy"],
                 relationship=Relationship(trust=row["trust"], respect=row["respect"], fear=row["fear"], affection=row["affection"]),
                 memories=memories,
             )
@@ -164,9 +165,11 @@ class SQLiteRepository:
         npc_id = f"npc_{self._slug(payload.name)}_{uuid4().hex[:6]}"
         with self.database.connect() as db:
             db.execute(
-                "INSERT INTO npcs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                """INSERT INTO npcs(id,campaign_id,name,location_id,faction_id,traits,goals,values_json,secrets,active,autonomy)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (npc_id, campaign_id, payload.name, payload.location_id, payload.faction_id,
-                 json.dumps(payload.traits), json.dumps(payload.goals), json.dumps(payload.values), json.dumps(payload.secrets)),
+                 json.dumps(payload.traits), json.dumps(payload.goals), json.dumps(payload.values), json.dumps(payload.secrets),
+                 int(payload.active), payload.autonomy),
             )
             relation = payload.relationship
             db.execute("INSERT INTO relationships VALUES (?, ?, ?, ?, ?)", (npc_id, relation.trust, relation.respect, relation.fear, relation.affection))
@@ -443,6 +446,7 @@ class SQLiteRepository:
             inventory_transactions=party_repo.list_transactions(campaign_id, 10000),
             campaign_records=operations.list_records(campaign_id),
             campaign_activities=operations.list_activities(campaign_id, 10000),
+            dice_rolls=tools.list_dice_rolls(campaign_id, 10000),
         )
 
     def import_campaign(self, package: CampaignBundle) -> Campaign:
@@ -473,7 +477,10 @@ class SQLiteRepository:
             for item in package.factions:
                 db.execute("INSERT INTO factions VALUES (?, ?, ?, ?)", (item.id, c.id, item.name, item.description))
             for npc in package.npcs:
-                db.execute("INSERT INTO npcs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (npc.id, c.id, npc.name, npc.location_id, npc.faction_id, json.dumps(npc.traits), json.dumps(npc.goals), json.dumps(npc.values), json.dumps(npc.secrets)))
+                db.execute("""INSERT INTO npcs(id,campaign_id,name,location_id,faction_id,traits,goals,values_json,secrets,active,autonomy)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           (npc.id, c.id, npc.name, npc.location_id, npc.faction_id, json.dumps(npc.traits),
+                            json.dumps(npc.goals), json.dumps(npc.values), json.dumps(npc.secrets), int(npc.active), npc.autonomy))
                 r = npc.relationship
                 db.execute("INSERT INTO relationships VALUES (?, ?, ?, ?, ?)", (npc.id, r.trust, r.respect, r.fear, r.affection))
                 for memory in npc.memories:
@@ -504,7 +511,10 @@ class SQLiteRepository:
                            json.dumps(item.items), json.dumps(item.narrative_rewards), json.dumps(item.context_reasons),
                            item.created_at, int(item.claimed), item.claimed_at))
             for item in package.lore_entries:
-                db.execute("INSERT INTO lore_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (item.id, c.id, item.layer, item.category, item.title, item.content, item.source_id, item.location_id, item.created_at))
+                db.execute("""INSERT INTO lore_entries(id,campaign_id,layer,category,title,content,source_id,source_page,location_id,created_at)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           (item.id, c.id, item.layer, item.category, item.title, item.content,
+                            item.source_id, item.source_page, item.location_id, item.created_at))
             for item in package.hex_cells:
                 db.execute("""INSERT INTO hex_cells(id,campaign_id,q,r,terrain,title,discovery,travel_cost,encounter_chance,
                            player_notes,dm_notes,location_id,source_id,risk_level,alert_level,risk_tags)
@@ -530,7 +540,11 @@ class SQLiteRepository:
                 db.execute("INSERT INTO hexcrawl_settings(campaign_id) VALUES (?)", (c.id,))
             if package.player_view_settings:
                 item = package.player_view_settings
-                db.execute("INSERT INTO player_view_settings VALUES (?,?,?,?,?,?,?,?,?,?)", (c.id, int(item.enabled), int(item.show_map), int(item.show_rumors), int(item.show_resources), int(item.show_weather), int(item.show_combat), int(item.show_enemy_hp), int(item.show_characters), int(item.show_inventory)))
+                db.execute("""INSERT INTO player_view_settings(campaign_id,enabled,show_map,show_rumors,show_resources,
+                           show_weather,show_combat,show_enemy_hp,show_characters,show_inventory,show_library)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?)""", (c.id, int(item.enabled), int(item.show_map),
+                           int(item.show_rumors), int(item.show_resources), int(item.show_weather), int(item.show_combat),
+                           int(item.show_enemy_hp), int(item.show_characters), int(item.show_inventory), int(item.show_library)))
             else:
                 db.execute("INSERT INTO player_view_settings(campaign_id) VALUES (?)", (c.id,))
             if package.expedition_state:
@@ -571,4 +585,10 @@ class SQLiteRepository:
                 db.execute("INSERT INTO campaign_activities VALUES (?,?,?,?,?,?,?,?,?)", (item.id, c.id,
                            item.session_id, item.kind, item.title, item.details, item.visibility,
                            item.linked_id, item.created_at))
+            for item in package.dice_rolls:
+                db.execute("""INSERT INTO dice_rolls(id,campaign_id,notation,label,actor,mode,dice,kept,modifier,total,dc,
+                           success,critical,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (item.id, c.id,
+                           item.notation, item.label, item.actor, item.mode, json.dumps(item.dice), json.dumps(item.kept),
+                           item.modifier, item.total, item.dc, None if item.success is None else int(item.success),
+                           item.critical, item.created_at))
         return self.get_campaign(c.id)  # type: ignore[return-value]

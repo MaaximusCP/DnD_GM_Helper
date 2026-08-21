@@ -4,7 +4,7 @@ Assistent local per a directors de joc de D&D 5e. Manté l'estat de la campanya,
 
 ![Dashboard local de GM AI](docs/assets/dashboard.png)
 
-Aquest repositori implementa la **vertical slice 0.1** definida a [`projecte_gm_ai.md`](projecte_gm_ai.md):
+Aquest repositori implementa la **versió 1.1 local-first** definida a [`projecte_gm_ai.md`](projecte_gm_ai.md):
 
 - dashboard de sessió usable al navegador;
 - una campanya de demostració, una localització, una facció i tres NPC;
@@ -27,7 +27,7 @@ Aquest repositori implementa la **vertical slice 0.1** definida a [`projecte_gm_
 - Campaign Studio amb múltiples campanyes, selector actiu, creació, importació i arxiu;
 - editor de món, localitzacions, faccions, grup i variables personalitzades;
 - editor visual de taules homebrew, terrenys, rangs, pesos i etiquetes;
-- catàleg local SRD 5.1 amb 1.252 objectes, peces d'equipament, monstres i encanteris;
+- catàleg local SRD 5.1 amb 1.267 objectes, peces d'equipament, monstres, encanteris i condicions;
 - integració del catàleg SRD amb Encounter Engine, Reward Engine i taules custom;
 - capes separades per a informació només DM, coneixement dels jugadors i estat real del món;
 - hexcrawl persistent de Chult amb descobriment, terreny, viatge, encounters i notes separades;
@@ -52,6 +52,13 @@ Aquest repositori implementa la **vertical slice 0.1** definida a [`projecte_gm_
 - mapes d'imatge locals amb marcadors percentuals i visibilitat DM/jugadors;
 - vincles entre documents de biblioteca, missions, escenes, mapes i notes de pàgina;
 - hexcrawl amb risc, etiquetes de perill i alerta dinàmica que modifica navegació i encounters;
+- quatre plantilles reutilitzables: campanya en blanc, expedició selvàtica, intriga urbana i dungeon;
+- NPC actius amb autonomia configurable i accions entre sessions sempre pendents d'aprovació;
+- avanç opcional del calendari durant el downtime, amb edició, aplicació o descart individual;
+- conversió de fragments documentals en lore DM, coneixement dels jugadors o estat del món;
+- visibilitat i obertura directa de fonts locals, conservant `source_id` i pàgina d'origen;
+- safata de daus de campanya amb notació `NdX`, modificadors, CD, avantatge/desavantatge i historial SQLite;
+- referència ràpida de les 15 condicions SRD per consultar-les durant la sessió;
 - API REST documentada automàticament amb OpenAPI.
 
 > El projecte no distribueix text, mapes, personatges ni altres continguts de cap aventura comercial. Pots importar-hi el contingut que tinguis dret a utilitzar.
@@ -138,14 +145,19 @@ Les vistes `Pantalla jugadors`, `Coneixement`, `Hexcrawl` i `Combat` incorporen 
 
 ## Catàleg SRD local
 
-`Catàleg SRD` ofereix 1.252 entrades consultables sense Internet:
+`Catàleg SRD` ofereix 1.267 entrades consultables sense Internet:
 
 - 362 objectes màgics;
 - 237 peces d'equipament;
 - 334 monstres;
 - 319 encanteris.
+- 15 condicions de combat i aventura.
 
 El contingut procedeix de l'SRD 5.1 sota CC-BY-4.0. Consulta [`NOTICE-SRD.md`](NOTICE-SRD.md) per a l'atribució. `scripts/import_srd_catalog.py` permet regenerar l'artefacte a partir de D&D 5e API. No s'han copiat taules ni textos de Donjon o llibres comercials sense llicència.
+
+## Eines de taula
+
+El mòdul `Eines de taula` permet fer tirades normals o d20 amb avantatge/desavantatge, indicar una CD opcional i conservar les darreres tirades per campanya. També inclou la referència local de condicions de l'SRD. El comportament, els límits i les fonts de regles es documenten a [`docs/session-toolkit.md`](docs/session-toolkit.md).
 
 ## Encounter i Reward Engine
 
@@ -186,7 +198,9 @@ La base de dades és la font de veritat. El LLM rep només el context rellevant 
 
 ## Abast actual i roadmap
 
-La versió 0.9 incorpora Campaign Operations: missions, calendari, clocks, Session Planner, cronologia, resolució d'encounters, progressió, mapes amb marcadors, vincles documentals i risc/alerta al hexcrawl. Tot funciona localment, es pot ocultar per mòduls i forma part dels backups i paquets d'exportació. Queden per a la 1.0 l'OCR, embeddings semàntics, simulació autònoma d'NPC i sincronització remota opcional.
+La versió 1.1 completa el motor local de campanyes amb plantilles, NPC actius, downtime revisable, el flux document → fragment → aprovació → coneixement canònic i les utilitats de daus i condicions per dirigir una sessió. Tot funciona sense Azure ni connexió a Internet i es pot ocultar per mòduls.
+
+Queden com a ampliacions opcionals l'OCR local per a PDF escanejat, la cerca semàntica amb embeddings locals, l'empaquetat desktop i la sincronització remota. Cap d'aquestes peces és necessària per utilitzar el nucli actual.
 
 El botó de controls de la capçalera obre les [preferències de la interfície](docs/ui-settings.md). Es pot simplificar el menú per sessió sense eliminar dades ni afectar altres navegadors.
 

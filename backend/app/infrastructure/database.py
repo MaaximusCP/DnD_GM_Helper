@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS npcs (
     id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, name TEXT NOT NULL,
     location_id TEXT NOT NULL, faction_id TEXT, traits TEXT NOT NULL,
     goals TEXT NOT NULL, values_json TEXT NOT NULL, secrets TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 0, autonomy INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 CREATE TABLE IF NOT EXISTS relationships (
@@ -120,7 +121,7 @@ CREATE TABLE IF NOT EXISTS rewards (
 CREATE TABLE IF NOT EXISTS lore_entries (
     id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, layer TEXT NOT NULL,
     category TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL,
-    source_id TEXT, location_id TEXT, created_at TEXT NOT NULL,
+    source_id TEXT, source_page INTEGER, location_id TEXT, created_at TEXT NOT NULL,
     FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 CREATE TABLE IF NOT EXISTS hex_cells (
@@ -175,11 +176,19 @@ CREATE TABLE IF NOT EXISTS player_view_settings (
     show_rumors INTEGER NOT NULL DEFAULT 1, show_resources INTEGER NOT NULL DEFAULT 1,
     show_weather INTEGER NOT NULL DEFAULT 1, show_combat INTEGER NOT NULL DEFAULT 1,
     show_enemy_hp INTEGER NOT NULL DEFAULT 0, show_characters INTEGER NOT NULL DEFAULT 1,
-    show_inventory INTEGER NOT NULL DEFAULT 1, FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+    show_inventory INTEGER NOT NULL DEFAULT 1, show_library INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 CREATE TABLE IF NOT EXISTS combat_logs (
     id TEXT PRIMARY KEY, combat_id TEXT NOT NULL, message TEXT NOT NULL, kind TEXT NOT NULL,
     created_at TEXT NOT NULL, FOREIGN KEY(combat_id) REFERENCES combats(id)
+);
+CREATE TABLE IF NOT EXISTS dice_rolls (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, notation TEXT NOT NULL,
+    label TEXT NOT NULL, actor TEXT NOT NULL DEFAULT '', mode TEXT NOT NULL DEFAULT 'normal',
+    dice TEXT NOT NULL, kept TEXT NOT NULL, modifier INTEGER NOT NULL DEFAULT 0,
+    total INTEGER NOT NULL, dc INTEGER, success INTEGER, critical TEXT, created_at TEXT NOT NULL,
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
 );
 CREATE TABLE IF NOT EXISTS characters (
     id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, name TEXT NOT NULL, player_name TEXT NOT NULL DEFAULT '',
@@ -247,9 +256,17 @@ class Database:
             source_columns = {row["name"] for row in connection.execute("PRAGMA table_info(content_sources)")}
             if "asset_kind" not in source_columns:
                 connection.execute("ALTER TABLE content_sources ADD COLUMN asset_kind TEXT NOT NULL DEFAULT 'document'")
+            lore_columns = {row["name"] for row in connection.execute("PRAGMA table_info(lore_entries)")}
+            if "source_page" not in lore_columns:
+                connection.execute("ALTER TABLE lore_entries ADD COLUMN source_page INTEGER")
             campaign_columns = {row["name"] for row in connection.execute("PRAGMA table_info(campaigns)")}
             if "archived" not in campaign_columns:
                 connection.execute("ALTER TABLE campaigns ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+            npc_columns = {row["name"] for row in connection.execute("PRAGMA table_info(npcs)")}
+            if "active" not in npc_columns:
+                connection.execute("ALTER TABLE npcs ADD COLUMN active INTEGER NOT NULL DEFAULT 0")
+            if "autonomy" not in npc_columns:
+                connection.execute("ALTER TABLE npcs ADD COLUMN autonomy INTEGER NOT NULL DEFAULT 1")
             combat_columns = {row["name"] for row in connection.execute("PRAGMA table_info(combats)")}
             if "encounter_id" not in combat_columns:
                 connection.execute("ALTER TABLE combats ADD COLUMN encounter_id TEXT")
@@ -277,6 +294,8 @@ class Database:
                 connection.execute("ALTER TABLE player_view_settings ADD COLUMN show_characters INTEGER NOT NULL DEFAULT 1")
             if "show_inventory" not in player_columns:
                 connection.execute("ALTER TABLE player_view_settings ADD COLUMN show_inventory INTEGER NOT NULL DEFAULT 1")
+            if "show_library" not in player_columns:
+                connection.execute("ALTER TABLE player_view_settings ADD COLUMN show_library INTEGER NOT NULL DEFAULT 1")
             travel_columns = {row["name"] for row in connection.execute("PRAGMA table_info(travel_logs)")}
             if "encounter_id" not in travel_columns:
                 connection.execute("ALTER TABLE travel_logs ADD COLUMN encounter_id TEXT")
@@ -398,8 +417,9 @@ class Database:
         ]
         for npc_id, name, traits, goals, values, trust, respect, fear, affection in npcs:
             db.execute(
-                "INSERT INTO npcs VALUES (?, 'demo', ?, 'port_verd', 'gremi_exploradors', ?, ?, ?, '[]')",
-                (npc_id, name, json.dumps(traits), json.dumps(goals), json.dumps(values)),
+                """INSERT INTO npcs(id,campaign_id,name,location_id,faction_id,traits,goals,values_json,secrets,active,autonomy)
+                   VALUES (?, 'demo', ?, 'port_verd', 'gremi_exploradors', ?, ?, ?, '[]', ?, 1)""",
+                (npc_id, name, json.dumps(traits), json.dumps(goals), json.dumps(values), int(npc_id in {"kara", "nyra"})),
             )
             db.execute("INSERT INTO relationships VALUES (?, ?, ?, ?, ?)", (npc_id, trust, respect, fear, affection))
         db.execute(
@@ -443,7 +463,8 @@ class Database:
                 ("lore_world_demo", "world", "location", "Estació de pluges", "Les pluges han crescut els rius i han alentit totes les expedicions cap a l'interior."),
             ]
             for item_id, layer, category, title, content in lore:
-                db.execute("INSERT INTO lore_entries VALUES (?, 'demo', ?, ?, ?, ?, NULL, 'port_verd', datetime('now'))", (item_id, layer, category, title, content))
+                db.execute("""INSERT INTO lore_entries(id,campaign_id,layer,category,title,content,source_id,source_page,location_id,created_at)
+                              VALUES (?, 'demo', ?, ?, ?, ?, NULL, NULL, 'port_verd', datetime('now'))""", (item_id, layer, category, title, content))
         if not db.execute("SELECT 1 FROM hex_cells WHERE campaign_id='demo' LIMIT 1").fetchone():
             hexes = [
                 ("hex_demo_0_0", 0, 0, "urban", "Port Verd", "explored", 1, 5, "Punt de sortida i lloc segur.", "Els contactes del gremi poden proporcionar guies.", "port_verd"),

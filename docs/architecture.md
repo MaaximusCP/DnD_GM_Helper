@@ -9,6 +9,9 @@
 5. La UI continua sent navegable si no hi ha un LLM actiu.
 6. Els documents originals no es confonen amb l'estat viu de la campanya.
 7. Encounters i recompenses es generen des de taules filtrades, no des de text lliure del LLM.
+8. Els NPC actius només creen propostes; el DM continua sent l'únic que pot aplicar conseqüències.
+9. Un fragment documental no esdevé canònic fins que el DM el revisa i l'aprova.
+10. Les utilitats deterministes de sessió, com els daus, no depenen del LLM i en conserven l'historial per campanya.
 
 ## Flux d'un esdeveniment
 

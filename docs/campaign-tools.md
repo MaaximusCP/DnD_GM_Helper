@@ -31,6 +31,8 @@ Els descansos curts no avancen el calendari. Els descansos llargs poden consumir
 
 `GET /player-view/{campaign_id}` construeix una projecció segura amb només lore `players`, hexàgons descoberts, notes públiques, rumors permesos, recursos configurats i combat sanititzat. Els PG enemics són opcionals i les accions enemigues no s'exposen. Si la pantalla està desactivada, l'endpoint retorna `403`.
 
+Les fonts de Biblioteca marcades com a `players` també es poden mostrar en aquesta pantalla amb un control independent. La projecció elimina la ruta física i el checksum abans d'enviar-ne les metadades al navegador.
+
 La URL del navegador és `?player=<campaign_id>` i s'actualitza automàticament. Aquesta separació evita filtracions accidentals en el payload, però no substitueix autenticació quan l'aplicació s'exposi a Internet.
 
 ## Assistent de combat
@@ -55,6 +57,12 @@ La UI permet cercar monstres SRD, afegir-ne múltiples còpies, duplicar combate
 ## Criteri d'interfície
 
 Les accions freqüents es mostren directament i la configuració secundària utilitza blocs desplegables. Aquest patró s'aplica a notes d'hex, eines de zona, creació, campament, detalls de resolució i cua d'encounters. Així es conserva context visual sense obligar el DM a desplaçar-se per formularis llargs.
+
+## NPC actius i downtime
+
+Cada NPC pot quedar passiu o marcar-se com a actiu amb autonomia baixa, mitjana o alta. El mòdul `Simulació` permet seleccionar quins NPC intervenen, definir entre 1 i 30 dies i decidir si també avança el calendari. El motor local combina objectius, localització, facció i autonomia per crear una proposta privada per NPC.
+
+Les propostes es desen com a esdeveniments `pending`: es poden editar, ignorar o aplicar individualment. Generar downtime mai actualitza relacions, memòries, reputació ni estat del món directament.
 
 ## Flux futur des de documents
 

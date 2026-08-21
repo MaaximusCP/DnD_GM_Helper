@@ -32,6 +32,11 @@ class CampaignCreate(BaseModel):
     location_name: str = Field(default="Punt de partida", min_length=2, max_length=120)
 
 
+class CampaignTemplateCreate(BaseModel):
+    template_id: Literal["blank", "jungle_expedition", "urban_intrigue", "dungeon_delve"] = "blank"
+    name: str = Field(min_length=2, max_length=120)
+
+
 class CampaignUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=120)
     current_day: int | None = Field(default=None, ge=1, le=100000)
@@ -104,6 +109,7 @@ class LoreEntry(BaseModel):
     title: str
     content: str
     source_id: str | None = None
+    source_page: int | None = Field(default=None, ge=1)
     location_id: str | None = None
     created_at: str = Field(default_factory=utc_now)
 
@@ -115,6 +121,7 @@ class LoreEntryCreate(BaseModel):
     title: str = Field(min_length=2, max_length=200)
     content: str = Field(min_length=2, max_length=10000)
     source_id: str | None = None
+    source_page: int | None = Field(default=None, ge=1)
     location_id: str | None = None
 
 
@@ -124,6 +131,7 @@ class LoreEntryUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=2, max_length=200)
     content: str | None = Field(default=None, min_length=2, max_length=10000)
     source_id: str | None = None
+    source_page: int | None = Field(default=None, ge=1)
     location_id: str | None = None
 
 
@@ -303,6 +311,7 @@ class PlayerViewSettings(BaseModel):
     show_enemy_hp: bool = False
     show_characters: bool = True
     show_inventory: bool = True
+    show_library: bool = True
 
 
 class PlayerViewSettingsUpdate(BaseModel):
@@ -315,6 +324,7 @@ class PlayerViewSettingsUpdate(BaseModel):
     show_enemy_hp: bool | None = None
     show_characters: bool | None = None
     show_inventory: bool | None = None
+    show_library: bool | None = None
 
 
 class CharacterResource(BaseModel):
@@ -680,6 +690,31 @@ class CombatRollRequest(BaseModel):
     combatant_id: str | None = None
 
 
+class DiceRollRequest(BaseModel):
+    notation: str = Field(default="1d20", min_length=3, max_length=30)
+    label: str = Field(default="Tirada del DM", min_length=2, max_length=160)
+    actor: str = Field(default="", max_length=160)
+    mode: Literal["normal", "advantage", "disadvantage"] = "normal"
+    dc: int | None = Field(default=None, ge=1, le=40)
+
+
+class DiceRoll(BaseModel):
+    id: str
+    campaign_id: str
+    notation: str
+    label: str
+    actor: str = ""
+    mode: Literal["normal", "advantage", "disadvantage"] = "normal"
+    dice: list[int] = Field(default_factory=list)
+    kept: list[int] = Field(default_factory=list)
+    modifier: int = 0
+    total: int
+    dc: int | None = None
+    success: bool | None = None
+    critical: Literal["success", "failure"] | None = None
+    created_at: str = Field(default_factory=utc_now)
+
+
 class InitiativeRequest(BaseModel):
     automatic: bool = True
     rolls: dict[str, int] = Field(default_factory=dict)
@@ -742,6 +777,8 @@ class NPC(BaseModel):
     goals: list[str] = Field(default_factory=list)
     values: list[str] = Field(default_factory=list)
     secrets: list[str] = Field(default_factory=list)
+    active: bool = False
+    autonomy: int = Field(default=1, ge=0, le=3)
     relationship: Relationship = Field(default_factory=Relationship)
     memories: list[Memory] = Field(default_factory=list)
 
@@ -754,6 +791,8 @@ class NPCCreate(BaseModel):
     goals: list[str] = Field(default_factory=list, max_length=12)
     values: list[str] = Field(default_factory=list, max_length=12)
     secrets: list[str] = Field(default_factory=list, max_length=12)
+    active: bool = False
+    autonomy: int = Field(default=1, ge=0, le=3)
     relationship: Relationship = Field(default_factory=Relationship)
 
 
@@ -765,6 +804,8 @@ class NPCUpdate(BaseModel):
     goals: list[str] | None = Field(default=None, max_length=12)
     values: list[str] | None = Field(default=None, max_length=12)
     secrets: list[str] | None = Field(default=None, max_length=12)
+    active: bool | None = None
+    autonomy: int | None = Field(default=None, ge=0, le=3)
     relationship: Relationship | None = None
 
 
@@ -880,6 +921,11 @@ class ContentSource(BaseModel):
     created_at: str = Field(default_factory=utc_now)
 
 
+class ContentSourceUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    visibility: Literal["dm", "players"] | None = None
+
+
 class DocumentChunk(BaseModel):
     id: str
     source_id: str
@@ -894,7 +940,30 @@ class DocumentSearchResult(BaseModel):
     chunk_id: str
     page: int | None = None
     excerpt: str
+    content: str = ""
     score: float = 0
+
+
+class DocumentLoreRequest(BaseModel):
+    chunk_id: str
+    layer: Literal["dm", "players", "world"] = "dm"
+    category: Literal["lore", "npc", "location", "quest", "rule", "other"] = "lore"
+    title: str = Field(min_length=2, max_length=200)
+    content: str | None = Field(default=None, max_length=10000)
+    location_id: str | None = None
+
+
+class NPCActionRequest(BaseModel):
+    days: int = Field(default=1, ge=1, le=30)
+    npc_ids: list[str] = Field(default_factory=list, max_length=50)
+    advance_calendar: bool = False
+
+
+class NPCActionResult(BaseModel):
+    previous_day: int
+    current_day: int
+    proposals: list[EventProposal] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)
 
 
 class Knowledge(BaseModel):
@@ -1068,4 +1137,5 @@ class CampaignBundle(CampaignImport):
     inventory_transactions: list[InventoryTransaction] = Field(default_factory=list)
     campaign_records: list[CampaignRecord] = Field(default_factory=list)
     campaign_activities: list[CampaignActivity] = Field(default_factory=list)
+    dice_rolls: list[DiceRoll] = Field(default_factory=list)
     excluded_content_notice: str = "Els fitxers de la biblioteca documental no s'inclouen en l'exportació."

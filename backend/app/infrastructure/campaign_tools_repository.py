@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from app.domain.models import (
     Combat, CombatCreate, CombatLog, CombatUpdate, Combatant, CombatantCreate, CombatantUpdate,
+    DiceRoll, DiceRollRequest,
     ExpeditionState, ExpeditionStateUpdate, HexCell, HexCellCreate, HexCellUpdate, HexRevealRequest,
     HexcrawlSettings, HexcrawlSettingsUpdate, LoreEntry, LoreEntryCreate, LoreEntryUpdate,
     PlayerViewSettings, PlayerViewSettingsUpdate, TravelLog, utc_now,
@@ -13,6 +14,41 @@ from app.infrastructure.database import Database
 class CampaignToolsRepository:
     def __init__(self, database: Database):
         self.database = database
+
+    @staticmethod
+    def _dice_roll(row) -> DiceRoll:
+        data = dict(row)
+        data["dice"] = json.loads(data["dice"])
+        data["kept"] = json.loads(data["kept"])
+        data["success"] = None if data["success"] is None else bool(data["success"])
+        return DiceRoll(**data)
+
+    def list_dice_rolls(self, campaign_id: str, limit: int = 50) -> list[DiceRoll]:
+        with self.database.connect() as db:
+            rows = db.execute(
+                "SELECT * FROM dice_rolls WHERE campaign_id=? ORDER BY created_at DESC LIMIT ?",
+                (campaign_id, limit),
+            )
+            return [self._dice_roll(row) for row in rows]
+
+    def add_dice_roll(self, campaign_id: str, payload: DiceRollRequest, result: dict) -> DiceRoll:
+        item = DiceRoll(id=f"roll_{uuid4().hex[:12]}", campaign_id=campaign_id,
+                        **{**payload.model_dump(), **result})
+        with self.database.connect() as db:
+            db.execute(
+                """INSERT INTO dice_rolls(id,campaign_id,notation,label,actor,mode,dice,kept,modifier,total,dc,success,critical,created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (item.id, item.campaign_id, item.notation, item.label, item.actor, item.mode,
+                 json.dumps(item.dice), json.dumps(item.kept), item.modifier, item.total, item.dc,
+                 None if item.success is None else int(item.success), item.critical, item.created_at),
+            )
+        return item
+
+    def clear_dice_rolls(self, campaign_id: str) -> int:
+        with self.database.connect() as db:
+            count = db.execute("SELECT COUNT(*) FROM dice_rolls WHERE campaign_id=?", (campaign_id,)).fetchone()[0]
+            db.execute("DELETE FROM dice_rolls WHERE campaign_id=?", (campaign_id,))
+        return int(count)
 
     def list_lore(self, campaign_id: str, layer: str | None = None) -> list[LoreEntry]:
         with self.database.connect() as db:
@@ -25,9 +61,10 @@ class CampaignToolsRepository:
     def create_lore(self, payload: LoreEntryCreate) -> LoreEntry:
         item = LoreEntry(id=f"lore_{uuid4().hex[:12]}", **payload.model_dump())
         with self.database.connect() as db:
-            db.execute("INSERT INTO lore_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (
+            db.execute("""INSERT INTO lore_entries(id,campaign_id,layer,category,title,content,source_id,source_page,location_id,created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
                 item.id, item.campaign_id, item.layer, item.category, item.title, item.content,
-                item.source_id, item.location_id, item.created_at,
+                item.source_id, item.source_page, item.location_id, item.created_at,
             ))
         return item
 
