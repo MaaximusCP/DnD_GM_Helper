@@ -43,6 +43,7 @@ from app.infrastructure.database import Database
 from app.infrastructure.llm import create_provider
 from app.infrastructure.repository import SQLiteRepository
 from app.infrastructure.reference_catalog import ReferenceCatalog
+from app.infrastructure.homebrew_catalog import HomebrewCatalog, HomebrewPackError
 from app.infrastructure.simulation_repository import SimulationRepository
 from app.infrastructure.party_repository import PartyRepository
 from app.infrastructure.operations_repository import OperationsRepository
@@ -73,6 +74,10 @@ def get_party_repository(settings: Settings = Depends(get_settings)) -> PartyRep
 
 def get_operations_repository(settings: Settings = Depends(get_settings)) -> OperationsRepository:
     return OperationsRepository(Database(settings.database_path))
+
+
+def get_homebrew_catalog(settings: Settings = Depends(get_settings)) -> HomebrewCatalog:
+    return HomebrewCatalog(settings.homebrew_path)
 
 
 def _add_reference_combatants(repository: CampaignToolsRepository, combat_id: str,
@@ -573,6 +578,62 @@ def get_reference_item(item_id: str):
     item = ReferenceCatalog().get(item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Entrada SRD no trobada")
+    return item
+
+
+@router.get("/homebrew")
+def search_homebrew(q: str = "", category: str | None = None, terrain: str | None = None,
+                    level: int | None = None, difficulty: int | None = None,
+                    pack_id: str | None = None, limit: int = 50, offset: int = 0,
+                    catalog: HomebrewCatalog = Depends(get_homebrew_catalog)):
+    if limit < 1 or limit > 100 or offset < 0:
+        raise HTTPException(status_code=422, detail="Paginació no vàlida")
+    if level is not None and not 1 <= level <= 20:
+        raise HTTPException(status_code=422, detail="El nivell ha d'estar entre 1 i 20")
+    if difficulty is not None and not 1 <= difficulty <= 5:
+        raise HTTPException(status_code=422, detail="La dificultat ha d'estar entre 1 i 5")
+    return catalog.search(q, category, terrain, level, difficulty, pack_id, limit, offset)
+
+
+@router.get("/homebrew/meta")
+def homebrew_metadata(catalog: HomebrewCatalog = Depends(get_homebrew_catalog)):
+    return catalog.metadata()
+
+
+@router.get("/homebrew/packs")
+def list_homebrew_packs(catalog: HomebrewCatalog = Depends(get_homebrew_catalog)):
+    return catalog.packs()
+
+
+@router.post("/homebrew/packs/import", status_code=status.HTTP_201_CREATED)
+async def import_homebrew_pack(file: UploadFile = File(...),
+                               catalog: HomebrewCatalog = Depends(get_homebrew_catalog)):
+    if not file.filename or Path(file.filename).suffix.lower() != ".json":
+        raise HTTPException(status_code=422, detail="Cal seleccionar un fitxer JSON")
+    try:
+        return catalog.import_pack(await file.read())
+    except HomebrewPackError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.delete("/homebrew/packs/{pack_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_homebrew_pack(pack_id: str, confirm: bool = False,
+                         catalog: HomebrewCatalog = Depends(get_homebrew_catalog)):
+    if not confirm:
+        raise HTTPException(status_code=422, detail="Cal confirm=true")
+    try:
+        if not catalog.delete_pack(pack_id):
+            raise HTTPException(status_code=404, detail="Pack homebrew no trobat")
+    except HomebrewPackError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/homebrew/item/{item_id:path}")
+def get_homebrew_item(item_id: str, catalog: HomebrewCatalog = Depends(get_homebrew_catalog)):
+    item = catalog.get(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Entrada homebrew no trobada")
     return item
 
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Archive, BookOpen, Bot, ChevronRight, CircleAlert, Clock3, Database, Dices,
-  Download, FileText, Gift, LayoutDashboard, Map, MessageSquare, Plus, Save,
+  Download, FileText, Gift, Landmark, LayoutDashboard, Map, MessageSquare, Plus, Save,
   Search, Settings2, Shield, SlidersHorizontal, Sparkles, Swords, Trash2, Undo2, UserPlus, Users, X,
 } from 'lucide-react'
 import { api } from './api'
@@ -10,12 +10,13 @@ import { PartyManager } from './PartyManager'
 import { OperationsStudio } from './OperationsStudio'
 import { SimulationStudio } from './SimulationStudio'
 import { SessionToolkit } from './SessionToolkit'
+import { JungleToolkit } from './JungleToolkit'
 import type {
   Campaign, CampaignTemplate, Dashboard, DocumentResult, Encounter, EventProposal, Faction,
   GenerationEntry, Knowledge, Location, NPC, NPCCreate, ReferenceItem, Reward,
 } from './types'
 
-type View = 'session'|'tools'|'operations'|'simulation'|'world'|'party'|'players'|'knowledge'|'hexcrawl'|'combat'|'factions'|'library'|'reference'|'tables'
+type View = 'session'|'tools'|'homebrew'|'operations'|'simulation'|'world'|'party'|'players'|'knowledge'|'hexcrawl'|'combat'|'factions'|'library'|'reference'|'tables'
 type GeneratorKind = 'encounter'|'reward'
 type ConfigurableModule = View|'encounter'|'reward'
 type UIPreferences = {
@@ -28,11 +29,11 @@ type UIPreferences = {
 
 const UI_STORAGE_KEY='gm-ai-ui-preferences-v1'
 const defaultPreferences:UIPreferences={
-  modules:{session:true,tools:true,operations:true,simulation:true,world:true,party:true,players:true,knowledge:true,hexcrawl:true,combat:true,factions:true,library:true,reference:true,tables:true,encounter:true,reward:true},
+  modules:{session:true,tools:true,homebrew:true,operations:true,simulation:true,world:true,party:true,players:true,knowledge:true,hexcrawl:true,combat:true,factions:true,library:true,reference:true,tables:true,encounter:true,reward:true},
   compact:false,showContextPanel:true,reduceMotion:false,largeText:false,
 }
 const navItems:[View,typeof LayoutDashboard,string,string][]=[
-  ['session',LayoutDashboard,'Sessió','Dashboard, NPC i cronologia'],['tools',Dices,'Eines de taula','Daus, historial i condicions SRD'],['world',Map,'Món','Campanya, grup i localitzacions'],
+  ['session',LayoutDashboard,'Sessió','Dashboard, NPC i cronologia'],['tools',Dices,'Eines de taula','Daus, historial i condicions SRD'],['homebrew',Landmark,'Laboratori de selva','Enemics, temples, situacions i minijocs'],['world',Map,'Món','Campanya, grup i localitzacions'],
   ['operations',FileText,'Operacions','Missions, calendari, clocks i planificació'],
   ['simulation',Bot,'Simulació','Agendes i accions dels NPC actius'],
   ['party',Users,'Grup i inventari','Personatges, equip i tresoreria'],
@@ -203,6 +204,7 @@ export default function App() {
   if(error&&!data)return <main className="offline"><CircleAlert/><h1>No s’ha pogut obrir la campanya</h1><p>{error}</p><button onClick={()=>{void refreshCampaigns();void load()}}>Tornar-ho a provar</button></main>
   if(!data)return <main className="loading"><Sparkles/><span>Carregant el món…</span></main>
   if(view==='tools')return <div className={`tool-standalone ${uiClass}`}><header><div className="brand-mark">GM</div><div><span>Campaign Engine</span><strong>{data.campaign.name}</strong></div><button onClick={()=>setView('session')}><ChevronRight className="back-chevron"/> Tornar a la campanya</button></header><main><SessionToolkit data={data}/></main></div>
+  if(view==='homebrew')return <div className={`tool-standalone ${uiClass}`}><header><div className="brand-mark">GM</div><div><span>Campaign Engine</span><strong>{data.campaign.name}</strong></div><button onClick={()=>setView('session')}><ChevronRight className="back-chevron"/> Tornar a la campanya</button></header><main><JungleToolkit data={data} changed={()=>void load()}/></main></div>
   if(view==='operations'||view==='simulation'||view==='party'||view==='players'||view==='knowledge'||view==='hexcrawl'||view==='combat')return <div className={`tool-standalone ${uiClass}`}><header><div className="brand-mark">GM</div><div><span>Campaign Engine</span><strong>{data.campaign.name}</strong></div><button onClick={()=>setView('session')}><ChevronRight className="back-chevron"/> Tornar a la campanya</button></header><main>{view==='operations'&&<OperationsStudio data={data} changed={()=>void load()}/>} {view==='simulation'&&<SimulationStudio data={data} changed={()=>void load()}/>} {view==='party'&&<PartyManager data={data} changed={()=>void load()}/>} {view==='players'&&<PlayerViewManager data={data} changed={()=>void load()}/>} {view==='knowledge'&&<KnowledgeLayers data={data} changed={()=>void load()}/>} {view==='hexcrawl'&&<HexcrawlStudio data={data} changed={()=>void load()}/>} {view==='combat'&&<CombatAssistant data={data} changed={()=>void load()}/>}</main></div>
   if(view==='reference')return <div className={`catalog-standalone ${uiClass}`}><header><div className="brand-mark">GM</div><div><span>Campaign Engine</span><strong>{data.campaign.name}</strong></div><button onClick={()=>setView('session')}><ChevronRight className="back-chevron"/> Tornar a la campanya</button></header><main><ReferenceCatalog key={data.campaign.id} data={data} changed={()=>void load()}/></main></div>
   return <div className={`app-shell ${uiClass}`}>

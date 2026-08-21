@@ -1,0 +1,285 @@
+{
+  "format_version": 1,
+  "id": "jungle-expedition-core",
+  "name": "Expedició a la Selva — Pack original",
+  "version": "1.0.0",
+  "license": "MIT",
+  "attribution": "Contingut homebrew original creat per al projecte GM AI. No reprodueix cap aventura ni bestiari comercial.",
+  "rules_profile": "dnd5e-2014",
+  "sources": [
+    "https://www.dndbeyond.com/sources/dnd/basic-rules-2014/using-ability-scores",
+    "https://www.dndbeyond.com/sources/dnd/basic-rules-2014/adventuring",
+    "https://www.dndbeyond.com/sources/dnd/basic-rules-2014/building-combat-encounters",
+    "https://www.dndbeyond.com/sources/dnd/basic-rules-2014/running-the-game"
+  ],
+  "counts": {"enemy": 8, "temple": 8, "situation": 12, "minigame": 6},
+  "items": [
+    {
+      "id": "hb:jungle:enemy:glass-frond", "category": "enemy", "name": "Falguerer de vidre",
+      "summary": "Planta caçadora que imita la llum entre les fulles i ataca des d'una immobilitat perfecta.",
+      "terrains": ["jungle", "forest", "ruins"], "min_level": 1, "max_level": 4, "difficulty": 2,
+      "tags": ["plant", "ambush", "camouflage"],
+      "data": {"challenge_rating": 0.5, "xp": 100, "size": "Medium", "type": "plant", "armor_class": 13, "hit_points": 22, "initiative_bonus": 1, "speed": "20 ft.",
+        "traits": ["Reflexos de cristall: té avantatge per ocultar-se entre vegetació humida.", "Trencadís: quan rep dany contundent, la seva CA baixa a 11 fins al torn següent."],
+        "actions": [{"name": "Fulla serrada", "description": "Atac cos a cos +3; abast 5 ft.; 1d8+1 tallant."}, {"name": "Esclat de rosada", "description": "Recàrrega 5–6; con de 15 ft., salvació DES CD 12 o 2d6 radiant i blinded fins al final del torn següent."}],
+        "tactics": "Espera que el grup passi, encega la rereguarda i es retira entre cobertura.", "salvage": "Tres làmines transparents que poden funcionar com miralls o components de 8 gp."}
+    },
+    {
+      "id": "hb:jungle:enemy:ash-monkey", "category": "enemy", "name": "Mico de cendra",
+      "summary": "Carronyaire nerviós que roba objectes brillants i llança fruits fumants des del dosser.",
+      "terrains": ["jungle", "forest", "urban"], "min_level": 1, "max_level": 3, "difficulty": 1,
+      "tags": ["beast", "swarm", "thief"],
+      "data": {"challenge_rating": 0.25, "xp": 50, "size": "Small", "type": "beast", "armor_class": 12, "hit_points": 11, "initiative_bonus": 2, "speed": "30 ft., climb 30 ft.",
+        "traits": ["Fugida àgil: pot fer Disengage com a acció addicional.", "Col·leccionista: prioritza robar un objecte visible abans de matar."],
+        "actions": [{"name": "Mossegada", "description": "Atac cos a cos +4; 1d4+2 perforant."}, {"name": "Fruit fumant", "description": "Distància 20/60 ft.; una casella queda lleugerament enfosquida fins a l'inici del torn següent."}],
+        "tactics": "Actua en grups de 3–6, separa el grup amb fum i fuig si en cau la meitat.", "salvage": "La bossa amagada del grup conté 2d6 gp i una pista robada."}
+    },
+    {
+      "id": "hb:jungle:enemy:root-serpent", "category": "enemy", "name": "Serp d'arrel",
+      "summary": "Depredador vegetal que viatja sota la fullaraca i immobilitza les preses amb arrels vives.",
+      "terrains": ["jungle", "swamp", "ruins"], "min_level": 2, "max_level": 5, "difficulty": 2,
+      "tags": ["plant", "grapple", "burrow"],
+      "data": {"challenge_rating": 1, "xp": 200, "size": "Large", "type": "plant", "armor_class": 13, "hit_points": 38, "initiative_bonus": 1, "speed": "25 ft., burrow 15 ft.",
+        "traits": ["Terra remoguda: una Percepció passiva 14 detecta el seu rastre abans de l'emboscada.", "Arrels inflamables: rep 2 punts de dany addicional de qualsevol font de foc."],
+        "actions": [{"name": "Constricció", "description": "Atac +5; 1d8+3 contundent i grappled, escapada CD 13."}, {"name": "Brot punxegut", "description": "Línia de 20 ft.; DES CD 13 o 2d6 perforant i el terreny queda difícil."}],
+        "tactics": "Aïlla un objectiu, l'arrossega cap a cobertura i evita les flames.", "salvage": "Fibres resistents equivalents a 50 ft. de corda fina."}
+    },
+    {
+      "id": "hb:jungle:enemy:amber-blood-wasp", "category": "enemy", "name": "Vespa de sang ambre",
+      "summary": "Insecte enorme que marca una criatura amb feromones abans que arribi la resta del niu.",
+      "terrains": ["jungle", "forest", "ruins"], "min_level": 3, "max_level": 6, "difficulty": 3,
+      "tags": ["monstrosity", "poison", "reinforcements"],
+      "data": {"challenge_rating": 2, "xp": 450, "size": "Medium", "type": "monstrosity", "armor_class": 14, "hit_points": 45, "initiative_bonus": 3, "speed": "10 ft., fly 50 ft.",
+        "traits": ["Marca de niu: el primer objectiu ferit no pot ocultar-se de les vespes durant 1 hora.", "Ales fràgils: si rep 10 o més dany d'un sol atac, la velocitat de vol baixa a 25 ft."],
+        "actions": [{"name": "Agulló", "description": "Atac +5; 1d6+3 perforant i CON CD 13 o 2d6 verí."}, {"name": "Crida vibratòria", "description": "1/dia; al final de la ronda arriba una vespa jove amb 10 PG si el niu és a prop."}],
+        "tactics": "Marca el personatge més aïllat i lluita en altura.", "salvage": "Una glàndula d'ambre permet preparar una dosi d'antídot o verí suau."}
+    },
+    {
+      "id": "hb:jungle:enemy:mist-jaguar", "category": "enemy", "name": "Jaguar de boira",
+      "summary": "Caçador feèric que es desfà en vapor i reapareix al costat de qui mostra por.",
+      "terrains": ["jungle", "forest", "swamp"], "min_level": 4, "max_level": 8, "difficulty": 3,
+      "tags": ["fey", "teleport", "fear"],
+      "data": {"challenge_rating": 3, "xp": 700, "size": "Large", "type": "fey", "armor_class": 15, "hit_points": 68, "initiative_bonus": 4, "speed": "50 ft.",
+        "traits": ["Cos de boira: pot travessar l'espai d'una criatura, però no acabar-hi el moviment.", "Olor de por: té avantatge contra criatures frightened."],
+        "actions": [{"name": "Urpa de boira", "description": "Atac +6; 2d6+4 tallant."}, {"name": "Salt entre vapors", "description": "Acció addicional; teleport de 30 ft. entre dues zones de llum tènue o boira."}, {"name": "Rugit baix", "description": "Recàrrega 5–6; SAV CD 14 o frightened fins al final del torn següent."}],
+        "tactics": "Canvia de flanc cada ronda i abandona el combat si desapareix la boira.", "salvage": "Els bigotis conserven fred i serveixen per orientar-se dins boira natural."}
+    },
+    {
+      "id": "hb:jungle:enemy:basalt-sentinel", "category": "enemy", "name": "Sentinella de basalt",
+      "summary": "Estàtua de temple que desperta quan algú altera el pes d'un altar o pronuncia un nom prohibit.",
+      "terrains": ["ruins", "dungeon", "jungle"], "min_level": 5, "max_level": 10, "difficulty": 4,
+      "tags": ["construct", "guardian", "temple"],
+      "data": {"challenge_rating": 4, "xp": 1100, "size": "Large", "type": "construct", "armor_class": 17, "hit_points": 92, "initiative_bonus": -1, "speed": "25 ft.",
+        "traits": ["Pedra animada: resistència a tallant i perforant no màgic.", "Protocol visible: Investigació CD 15 revela el desencadenant i permet evitar el combat."],
+        "actions": [{"name": "Dos cops de puny", "description": "Dos atacs +7; cadascun 1d10+4 contundent."}, {"name": "Trepitjada sísmica", "description": "Recàrrega 5–6; radi 10 ft., DES CD 15 o 3d6 contundent i prone."}],
+        "tactics": "Bloqueja sortides i protegeix l'altar, però mai persegueix fora del recinte.", "salvage": "Nucli rúnic de 75 gp; retirar-lo sense eines requereix Arcana CD 15."}
+    },
+    {
+      "id": "hb:jungle:enemy:canopy-shadow", "category": "enemy", "name": "Ombra del dosser",
+      "summary": "Esperit territorial nascut de promeses trencades, capaç d'apagar torxes i records recents.",
+      "terrains": ["jungle", "ruins", "swamp"], "min_level": 7, "max_level": 13, "difficulty": 4,
+      "tags": ["undead", "memory", "darkness"],
+      "data": {"challenge_rating": 6, "xp": 2300, "size": "Medium", "type": "undead", "armor_class": 16, "hit_points": 112, "initiative_bonus": 4, "speed": "0 ft., fly 40 ft." ,
+        "traits": ["Llum famolenca: la llum no màgica a 20 ft. esdevé tènue.", "Nom recordat: dir en veu alta el seu nom original anul·la les resistències fins al torn següent."],
+        "actions": [{"name": "Tacte d'oblit", "description": "Atac +7; 3d6+4 necròtic i l'objectiu perd reacció fins al seu torn."}, {"name": "Records dispersos", "description": "Recàrrega 5–6; INT CD 15 o incapacitated fins al final del torn mentre reviu un record aliè."}, {"name": "Pas d'ombra", "description": "Teleport de 40 ft. entre zones de llum tènue."}],
+        "tactics": "Apaga llums, divideix el grup i negocia si algú descobreix el seu nom.", "salvage": "Un record cristal·litzat que revela una escena antiga del temple."}
+    },
+    {
+      "id": "hb:jungle:enemy:ceiba-colossus", "category": "enemy", "name": "Colós de ceiba",
+      "summary": "Arbre caminant despertat per una profanació; cada arrel defensa una història diferent del bosc.",
+      "terrains": ["jungle", "forest", "ruins"], "min_level": 10, "max_level": 17, "difficulty": 5,
+      "tags": ["plant", "boss", "lair"],
+      "data": {"challenge_rating": 8, "xp": 3900, "size": "Huge", "type": "plant", "armor_class": 17, "hit_points": 168, "initiative_bonus": -1, "speed": "30 ft.",
+        "traits": ["Tres arrels, tres segells: cada objectiu del temple resolt redueix els PG màxims en 20.", "Arrelament: no pot ser empès ni tombat mentre toqui terra natural."],
+        "actions": [{"name": "Multiatac", "description": "Fa dos atacs de branca."}, {"name": "Branca colossal", "description": "Atac +8; abast 15 ft.; 2d10+5 contundent."}, {"name": "Presó d'arrels", "description": "Punt a 60 ft.; FUE CD 16 o restrained; es pot destruir, CA 14 i 20 PG."}, {"name": "Pluja d'escorça", "description": "Recàrrega 5–6; radi 20 ft., DES CD 16, 4d8 perforant o meitat."}],
+        "tactics": "Controla l'espai i defensa el cor del temple; es calma si es restaura el jurament trencat.", "salvage": "Saba d'aurora per a tres pocions de curació superior o un ritual de restauració."}
+    },
+
+    {
+      "id": "hb:jungle:temple:seven-drips", "category": "temple", "name": "Temple de les Set Gotes",
+      "summary": "Un santuari vertical on set degoters marquen un ritme que obre cambres diferents.",
+      "terrains": ["jungle", "ruins", "dungeon"], "min_level": 2, "max_level": 6, "difficulty": 2, "tags": ["water", "rhythm", "vertical"],
+      "data": {"hook": "L'aigua d'una font sagrada ha deixat d'arribar al poblat.", "approach": "Una escala excavada darrere una cascada; el soroll imposa desavantatge a Percepció auditiva.",
+        "rooms": [{"name": "Pòrtic del ritme", "challenge": "Repetir set impactes; Investigació o Interpretació CD 12."}, {"name": "Galeria inclinada", "challenge": "Canalitzar l'aigua sense activar tres lloses de pressió."}, {"name": "Pou dels noms", "challenge": "Cada gota pronuncia una síl·laba d'un nom oblidat."}, {"name": "Cambra de la setena gota", "challenge": "Triar entre restaurar el cabal o quedar-se la perla d'aigua."}],
+        "guardian": "Falguerers de vidre alimentats pel degoteig.", "secret": "La setena gota és una llàgrima petrificada, no aigua.", "reward": "Perla que purifica 10 litres d'aigua al dia.", "escalation": "Cada error canvia el ritme i inunda una sala ja explorada."}
+    },
+    {
+      "id": "hb:jungle:temple:stone-jaguar", "category": "temple", "name": "Observatori del Jaguar de Pedra",
+      "summary": "Temple astronòmic cobert pel dosser; les estàtues miren constel·lacions invisibles de dia.",
+      "terrains": ["jungle", "ruins"], "min_level": 4, "max_level": 9, "difficulty": 3, "tags": ["stars", "guardian", "puzzle"],
+      "data": {"hook": "Un mapa només mostra la ruta durant una nit sense lluna.", "approach": "Cal arribar al sostre travessant ponts de pedra coberts de molsa.",
+        "rooms": [{"name": "Sala dels ulls tancats", "challenge": "Orientar quatre caps de jaguar segons ombres antigues."}, {"name": "Meridià trencat", "challenge": "Creuar un mecanisme giratori; Acrobàcies CD 14 o perdre recursos."}, {"name": "Cambra del cel fals", "challenge": "Distingir una estrella impossible amb Natura o Arcana CD 15."}, {"name": "Terrassa nocturna", "challenge": "El Jaguar de Pedra pregunta quin record mereix ser preservat."}],
+        "guardian": "Jaguar de boira o sentinella de basalt segons el nivell.", "secret": "L'observatori prediu crescudes, no esdeveniments celestes.", "reward": "Disc estel·lar que dona avantatge a una navegació nocturna per dia.", "escalation": "En fallar dos enigmes, el sostre gira i separa el grup."}
+    },
+    {
+      "id": "hb:jungle:temple:root-vault", "category": "temple", "name": "Cripta de les Arrels Parlants",
+      "summary": "Mausoleu viu on les arrels repeteixen versions incompatibles de la història dels enterrats.",
+      "terrains": ["jungle", "swamp", "dungeon"], "min_level": 3, "max_level": 8, "difficulty": 3, "tags": ["memory", "social", "roots"],
+      "data": {"hook": "Una arrel ha crescut dins la casa d'un testimoni i repeteix un crim antic.", "approach": "Entrada estreta sota una ceiba; cada flama oberta desperta espores.",
+        "rooms": [{"name": "Vestíbul de veus", "challenge": "Separar fets de rumors amb Perspicàcia CD 13."}, {"name": "Nínxol dels tres germans", "challenge": "Retornar tres objectes funeraris al propietari correcte."}, {"name": "Cor de terra", "challenge": "Negociar amb una arrel conscient que exigeix una veritat personal."}],
+        "guardian": "Serps d'arrel que només ataquen els qui menteixen.", "secret": "Cap dels tres germans va ser enterrat aquí.", "reward": "Una pregunta contestada honestament per la memòria del lloc.", "escalation": "Cada mentida augmenta el nivell d'alerta del temple en 1."}
+    },
+    {
+      "id": "hb:jungle:temple:sunken-sun", "category": "temple", "name": "Cenote del Sol Enfonsat",
+      "summary": "Un temple invertit sota aigües clares; les cambres superiors són les més profundes.",
+      "terrains": ["jungle", "river", "ruins"], "min_level": 5, "max_level": 11, "difficulty": 4, "tags": ["underwater", "light", "time"],
+      "data": {"hook": "Al migdia apareix sota l'aigua una porta de llum durant onze minuts.", "approach": "Descens amb cordes fins a una plataforma mig submergida.",
+        "rooms": [{"name": "Atrium d'aire antic", "challenge": "Administrar tres bosses d'aire abans que es dissolguin."}, {"name": "Escala cap avall", "challenge": "Nedar contra una corrent que canvia cada ronda."}, {"name": "Arxiu solar", "challenge": "Reflectir llum des de la superfície amb tres miralls."}, {"name": "Santuari invertit", "challenge": "Obrir la cambra sense deixar escapar l'última bombolla sagrada."}],
+        "guardian": "Una sentinella de basalt coberta de corall.", "secret": "El temple va ser enfonsat deliberadament per segellar una font.", "reward": "Lent que converteix llum solar en una hora de llum intensa.", "escalation": "El nivell de l'aigua puja una sala cada deu minuts."}
+    },
+    {
+      "id": "hb:jungle:temple:echo-masks", "category": "temple", "name": "Santuari de les Màscares d'Eco",
+      "summary": "Cada màscara repeteix l'última frase amb una emoció diferent i altera les portes.",
+      "terrains": ["ruins", "dungeon", "jungle"], "min_level": 6, "max_level": 12, "difficulty": 4, "tags": ["sound", "roleplay", "doors"],
+      "data": {"hook": "Un explorador torna parlant només amb les veus dels seus companys perduts.", "approach": "Corredor sense ecos; qualsevol soroll queda emmagatzemat a les parets.",
+        "rooms": [{"name": "Galeria de la ira", "challenge": "Dir una amenaça que no es vulgui complir."}, {"name": "Cambra del dol", "challenge": "Una màscara demana un record a canvi de la clau."}, {"name": "Cor dels ecos", "challenge": "Ordenar quatre frases per reconstruir una promesa."}],
+        "guardian": "Ombra del dosser vinculada a la màscara central.", "secret": "Les màscares conserven testimonis, no ànimes.", "reward": "Màscara capaç de reproduir una frase de fins a dotze paraules.", "escalation": "Les frases dels personatges es tornen ordres per als guardians."}
+    },
+    {
+      "id": "hb:jungle:temple:green-hour", "category": "temple", "name": "Temple de l'Hora Verda",
+      "summary": "Ruïna atrapada en el mateix instant de tarda; les ferides i objectes es restauren en canviar de sala.",
+      "terrains": ["jungle", "ruins"], "min_level": 8, "max_level": 14, "difficulty": 5, "tags": ["time", "loop", "exploration"],
+      "data": {"hook": "Una expedició envia el mateix missatge de socors cada dia.", "approach": "La pluja queda suspesa a l'aire en creuar el llindar.",
+        "rooms": [{"name": "Pati repetit", "challenge": "Identificar l'únic detall que canvia en cada bucle."}, {"name": "Cuina intacta", "challenge": "Conservar un objecte entre sales marcant-lo amb saba local."}, {"name": "Rellotge vegetal", "challenge": "Sacrificar temps propi o acumular perill per avançar."}, {"name": "Cambra del primer instant", "challenge": "Decidir quin esdeveniment del temple ha de passar finalment."}],
+        "guardian": "Versions anteriors del grup amb objectius incomplets.", "secret": "El bucle protegeix la selva d'una llavor que encara no ha germinat.", "reward": "Una llavor que permet repetir una prova fallada, una sola vegada.", "escalation": "Al tercer bucle, una complicació anterior es torna permanent."}
+    },
+    {
+      "id": "hb:jungle:temple:rainless-court", "category": "temple", "name": "Pati de la Pluja Buida",
+      "summary": "Recinte on plou cap amunt i les petjades apareixen abans que arribin els intrusos.",
+      "terrains": ["jungle", "ruins", "mountain"], "min_level": 7, "max_level": 13, "difficulty": 4, "tags": ["weather", "omen", "ritual"],
+      "data": {"hook": "Els núvols d'una vall han començat a descarregar aigua cap al cel.", "approach": "Escales relliscoses amb aigua ascendent; Atletisme CD 14.",
+        "rooms": [{"name": "Pati sec", "challenge": "Seguir petjades futures sense alterar-ne l'ordre."}, {"name": "Cisternes del cel", "challenge": "Equilibrar quatre comportes mentre el pes de l'aigua canvia."}, {"name": "Altar sense ombra", "challenge": "Interrompre o completar un ritual meteorològic."}],
+        "guardian": "Sacerdot original de la Pluja Buida amb sentinelles.", "secret": "El ritual desvia una tempesta que destruiria una comunitat llunyana.", "reward": "Ampolla que prediu el clima de l'endemà.", "escalation": "Cada comporta incorrecta augmenta una tempesta exterior."}
+    },
+    {
+      "id": "hb:jungle:temple:ceiba-oath", "category": "temple", "name": "Basílica del Jurament de Ceiba",
+      "summary": "Temple-arbre colossal amb tres santuaris que representen deure, memòria i renúncia.",
+      "terrains": ["jungle", "forest", "ruins"], "min_level": 10, "max_level": 17, "difficulty": 5, "tags": ["boss", "oath", "nonlinear"],
+      "data": {"hook": "La ceiba camina cada nit uns metres cap a una ciutat fronterera.", "approach": "Tres entrades a diferents altures; cada una modifica el recorregut.",
+        "rooms": [{"name": "Santuari del deure", "challenge": "Protegir una criatura que es nega a cooperar."}, {"name": "Santuari de la memòria", "challenge": "Renunciar temporalment a una competència per recuperar un nom."}, {"name": "Santuari de la renúncia", "challenge": "Deixar enrere una recompensa real per segellar una arrel."}, {"name": "Cor de ceiba", "challenge": "Combatre o restaurar el jurament del colós."}],
+        "guardian": "Colós de ceiba debilitat pels santuaris resolts.", "secret": "El jurament original protegia tant la selva com els primers colons.", "reward": "Benedicció narrativa: el bosc reconeix el grup durant una lluna.", "escalation": "Cada santuari ignorat afegeix una capacitat al guardià final."}
+    },
+
+    {
+      "id": "hb:jungle:situation:silent-birds", "category": "situation", "name": "El silenci dels ocells",
+      "summary": "Tots els ocells callen alhora; alguna cosa s'apropa o la selva vol que el grup escolti.",
+      "terrains": ["jungle", "forest"], "min_level": 1, "max_level": 20, "difficulty": 2, "tags": ["omen", "choice"],
+      "data": {"prompt": "El silenci avança com una ona des del nord.", "choices": [{"label": "Amagar-se i observar", "check": "Wisdom (Perception)", "dc": 12, "success": "Descobreixen el perill abans de ser vistos.", "failure": "Perden temps i el perill canvia de direcció."}, {"label": "Seguir l'ona de silenci", "check": "Wisdom (Survival)", "dc": 14, "success": "Troben un rastre o una escena recent.", "failure": "Entren en terreny de risc +1."}], "twist": "No hi ha depredador: els ocells imiten un avís humà antic.", "follow_up": "Crear una pista cap a la localització oculta més propera."}
+    },
+    {
+      "id": "hb:jungle:situation:walking-path", "category": "situation", "name": "El camí que camina",
+      "summary": "Un sender recent apareix cada matí desplaçat uns centenars de metres.",
+      "terrains": ["jungle", "swamp"], "min_level": 1, "max_level": 20, "difficulty": 3, "tags": ["navigation", "mystery"],
+      "data": {"prompt": "Les marques del grup són correctes, però ara queden al costat oposat.", "choices": [{"label": "Confiar en les marques", "check": "Intelligence (Investigation)", "dc": 14, "success": "Identifiquen que són els arbres els que s'han mogut.", "failure": "El grup perd mig dia."}, {"label": "Abandonar el sender", "check": "Group Wisdom (Survival)", "dc": 12, "success": "Avancen lentament sense perdre's.", "failure": "Arriben a un hex adjacent inesperat."}], "twist": "Una arrel enorme desplaça el sòl mentre dormen.", "follow_up": "El rastre apunta a la Cripta de les Arrels Parlants."}
+    },
+    {
+      "id": "hb:jungle:situation:rope-bridge-market", "category": "situation", "name": "Mercat del pont de corda",
+      "summary": "Tres famílies han muntat un mercat temporal sobre un barranc i cap admet qui cobra el peatge.",
+      "terrains": ["jungle", "mountain", "river"], "min_level": 1, "max_level": 10, "difficulty": 2, "tags": ["social", "trade", "height"],
+      "data": {"prompt": "El pont suporta el grup o les parades, però no tots dos alhora.", "choices": [{"label": "Negociar un pas ordenat", "check": "Charisma (Persuasion)", "dc": 13, "success": "Pas segur i un rumor fiable.", "failure": "Un venedor exigeix una penyora."}, {"label": "Reforçar el pont", "check": "Strength (Athletics) or tools", "dc": 12, "success": "Guanyen un contacte agraït.", "failure": "Cau mercaderia al barranc."}], "twist": "El cobrador real és un mico de cendra amb una bossa de fitxes.", "follow_up": "Afegir un contacte o una deuda comercial."}
+    },
+    {
+      "id": "hb:jungle:situation:upward-rain", "category": "situation", "name": "Pluja cap amunt",
+      "summary": "Durant deu minuts, els tolls ascendeixen en gotes cap als núvols i revelen objectes enterrats.",
+      "terrains": ["jungle", "ruins", "swamp"], "min_level": 2, "max_level": 20, "difficulty": 2, "tags": ["weather", "discovery"],
+      "data": {"prompt": "La terra s'asseca de cop i centenars d'objectes petits queden exposats.", "choices": [{"label": "Buscar una pista", "check": "Intelligence (Investigation)", "dc": 13, "success": "Troben una insígnia que identifica una expedició.", "failure": "Una cavitat col·lapsa sota el grup."}, {"label": "Recollir aigua", "check": "Dexterity check", "dc": 10, "success": "Recuperen 1d4 unitats d'aigua neta.", "failure": "Perden un recipient."}], "twist": "Una gota no puja: conté una memòria líquida.", "follow_up": "Augmentar o reduir alerta segons com reaccionin."}
+    },
+    {
+      "id": "hb:jungle:situation:borrowed-camp", "category": "situation", "name": "El campament prestat",
+      "summary": "El grup troba un campament idèntic al seu, preparat amb un dia d'antelació i sense ocupants.",
+      "terrains": ["jungle", "forest", "ruins"], "min_level": 3, "max_level": 20, "difficulty": 3, "tags": ["mystery", "rest"],
+      "data": {"prompt": "Fins i tot hi ha una nota escrita amb la lletra d'un personatge.", "choices": [{"label": "Descansar-hi", "check": "Wisdom (Insight)", "dc": 14, "success": "Detecten què no encaixa abans de dormir.", "failure": "El rellotge d'una amenaça avança 1."}, {"label": "Desmuntar-lo", "check": "Intelligence (Investigation)", "dc": 13, "success": "Troben un objecte deixat pel futur ocupant.", "failure": "Destrueixen una pista fràgil."}], "twist": "El campament pertany a una expedició que segueix exactament la mateixa ruta dies després.", "follow_up": "Crear un calendari per a l'arribada de l'altra expedició."}
+    },
+    {
+      "id": "hb:jungle:situation:amber-hive", "category": "situation", "name": "El rusc d'ambre",
+      "summary": "Un rusc colossal bloqueja el riu; conté mel medicinal i vespes marcadores.",
+      "terrains": ["jungle", "river", "forest"], "min_level": 3, "max_level": 9, "difficulty": 4, "tags": ["resource", "enemy", "choice"],
+      "data": {"prompt": "El riu creix darrere el rusc i inundarà una ruta segura.", "choices": [{"label": "Extreure mel sense trencar-lo", "check": "Dexterity (Sleight of Hand)", "dc": 15, "success": "Obtenen dues dosis curatives.", "failure": "Una vespa de sang ambre marca el grup."}, {"label": "Desviar el riu", "check": "Group Strength (Athletics)", "dc": 14, "success": "Protegeixen la ruta i eviten el niu.", "failure": "Perden subministraments a la crescuda."}], "twist": "El rusc protegeix una cria d'una criatura intel·ligent.", "follow_up": "Generar combat només si el grup insisteix o falla dues vegades."}
+    },
+    {
+      "id": "hb:jungle:situation:stone-procession", "category": "situation", "name": "Processó de pedra",
+      "summary": "Dotze estàtues caminen molt lentament cap a una ruïna, ignorant qualsevol obstacle.",
+      "terrains": ["jungle", "ruins", "mountain"], "min_level": 4, "max_level": 20, "difficulty": 3, "tags": ["construct", "omen", "route"],
+      "data": {"prompt": "Una estàtua porta un rostre idèntic al d'un NPC conegut.", "choices": [{"label": "Seguir la processó", "check": "Constitution save", "dc": 12, "success": "Arriben a una entrada secreta abans del vespre.", "failure": "Guanyen 1 esgotament o abandonen."}, {"label": "Aturar una estàtua", "check": "Strength check", "dc": 18, "success": "Revela una cavitat amb un missatge.", "failure": "L'estàtua continua i danya l'equip."}], "twist": "No són guardians: són claus que han d'arribar en ordre.", "follow_up": "Revelar un temple o augmentar-ne l'alerta si alteren l'ordre."}
+    },
+    {
+      "id": "hb:jungle:situation:fever-map", "category": "situation", "name": "Mapa de febre",
+      "summary": "Les venes d'un explorador malalt dibuixen una xarxa de rius que canvia amb la temperatura.",
+      "terrains": ["jungle", "swamp", "urban"], "min_level": 2, "max_level": 12, "difficulty": 3, "tags": ["disease", "map", "moral"],
+      "data": {"prompt": "El mapa sembla conduir a una font, però empitjora quan el pacient es refreda.", "choices": [{"label": "Tractar primer el pacient", "check": "Wisdom (Medicine)", "dc": 13, "success": "Es recupera i recorda una ruta parcial.", "failure": "La malaltia avança, però el mapa es completa."}, {"label": "Copiar el mapa", "check": "Dexterity or cartographer tools", "dc": 14, "success": "Conserven la ruta sense prolongar el patiment.", "failure": "Una bifurcació queda invertida."}], "twist": "El patró és una resposta màgica a l'aigua contaminada.", "follow_up": "Crear una missió per trobar la font de la infecció."}
+    },
+    {
+      "id": "hb:jungle:situation:talking-ferry", "category": "situation", "name": "La barca que pregunta",
+      "summary": "Una barca sense barquer travessa el riu si rep una resposta que mai hagi sentit.",
+      "terrains": ["river", "swamp", "jungle"], "min_level": 1, "max_level": 20, "difficulty": 2, "tags": ["social", "river", "riddle"],
+      "data": {"prompt": "La proa pregunta: 'Què portes que pesa menys quan ho comparteixes?'.", "choices": [{"label": "Respondre amb sinceritat", "check": "No check; interpretació", "dc": 0, "success": "La barca accepta una resposta personal nova.", "failure": "Demana una història diferent."}, {"label": "Forçar la barca", "check": "Strength (Athletics)", "dc": 15, "success": "Creuen, però la barca recorda l'ofensa.", "failure": "La corrent els retorna i perden 1 hora."}], "twist": "La barca comparteix una resposta d'un viatger desaparegut.", "follow_up": "Convertir la resposta en rumor o pista."}
+    },
+    {
+      "id": "hb:jungle:situation:moon-flowers", "category": "situation", "name": "Floració fora de lluna",
+      "summary": "Flors nocturnes s'obren a ple dia i projecten ombres que assenyalen una direcció.",
+      "terrains": ["jungle", "forest", "ruins"], "min_level": 1, "max_level": 20, "difficulty": 2, "tags": ["flora", "omen", "resource"],
+      "data": {"prompt": "Totes les ombres apunten contra el sol.", "choices": [{"label": "Seguir les ombres", "check": "Wisdom (Survival)", "dc": 12, "success": "Descobreixen un recurs o accés ocult.", "failure": "Entren en una zona de pol·len somnífer."}, {"label": "Collir les flors", "check": "Intelligence (Nature)", "dc": 13, "success": "Obtenen un reactiu valuós.", "failure": "Les flors es tanquen i emeten una crida."}], "twist": "Les ombres assenyalen la posició anterior d'un temple mòbil.", "follow_up": "Reduir la CD per trobar un temple aquesta jornada."}
+    },
+    {
+      "id": "hb:jungle:situation:two-suns", "category": "situation", "name": "Dos sols al riu",
+      "summary": "El reflex mostra dos sols i una silueta que no existeix a la riba real.",
+      "terrains": ["river", "swamp", "ruins"], "min_level": 5, "max_level": 20, "difficulty": 4, "tags": ["reflection", "portal", "mystery"],
+      "data": {"prompt": "La silueta del reflex fa senyals al grup abans d'ofegar-se.", "choices": [{"label": "Tocar el reflex", "check": "Wisdom save", "dc": 15, "success": "Veuen una escena passada sense quedar atrapats.", "failure": "Un personatge canvia temporalment de lloc amb el seu reflex."}, {"label": "Reproduir els senyals", "check": "Intelligence check", "dc": 14, "success": "Reben coordenades o una seqüència.", "failure": "La silueta interpreta una resposta hostil."}], "twist": "El segon sol és la llum del Cenote del Sol Enfonsat.", "follow_up": "Crear una escena o revelar la localització corresponent."}
+    },
+    {
+      "id": "hb:jungle:situation:roots-vote", "category": "situation", "name": "El vot de les arrels",
+      "summary": "Arrels de tres arbres bloquegen el pas i cadascuna demana una promesa incompatible.",
+      "terrains": ["jungle", "forest"], "min_level": 4, "max_level": 20, "difficulty": 4, "tags": ["social", "oath", "consequence"],
+      "data": {"prompt": "Una demana protegir, una recordar i una abandonar.", "choices": [{"label": "Escollir una promesa", "check": "No check", "dc": 0, "success": "El camí s'obre i queda un jurament persistent.", "failure": "No aplica: la conseqüència és narrativa."}, {"label": "Buscar una quarta opció", "check": "Charisma (Persuasion) or Intelligence (Nature)", "dc": 17, "success": "Les arrels accepten un servei concret.", "failure": "Risc +1 i el pas segueix tancat."}], "twist": "Cada arrel parla amb la veu d'algú que ja va fer aquella promesa.", "follow_up": "Registrar el jurament com a missió o world state."}
+    },
+
+    {
+      "id": "hb:jungle:minigame:canopy-crossing", "category": "minigame", "name": "Cursa pel dosser",
+      "summary": "Repte per rondes per travessar ponts vius abans que una tempesta els desfaci.",
+      "terrains": ["jungle", "forest"], "min_level": 1, "max_level": 10, "difficulty": 3, "tags": ["movement", "storm", "team"],
+      "data": {"target": 5, "danger_max": 3, "round_limit": 5, "setup": "Cada ronda un personatge lidera i no pot repetir la mateixa competència consecutivament.",
+        "checks": [{"name": "Trobar una branca segura", "ability": "Wisdom (Survival)", "dc": 12}, {"name": "Saltar un buit", "ability": "Strength (Athletics)", "dc": 13}, {"name": "Equilibrar el pont", "ability": "Dexterity (Acrobatics)", "dc": 14}, {"name": "Coordinar el grup", "ability": "Charisma (Persuasion)", "dc": 13}],
+        "twists": ["Una motxilla queda enganxada.", "El pont canvia de direcció.", "Un animal petit demana ajuda.", "La pluja redueix la visibilitat."], "success": "El grup arriba abans de la tempesta i descobreix una ruta elevada.", "failure": "Cauen a una zona segura però perden temps, equip o discreció."}
+    },
+    {
+      "id": "hb:jungle:minigame:flooded-temple", "category": "minigame", "name": "Fugida del temple inundat",
+      "summary": "Skill challenge de pressió creixent mentre l'aigua omple cambres ja explorades.",
+      "terrains": ["ruins", "dungeon", "river"], "min_level": 3, "max_level": 15, "difficulty": 4, "tags": ["escape", "water", "resource"],
+      "data": {"target": 6, "danger_max": 4, "round_limit": 6, "setup": "Cada fallada inunda una sala; gastar corda o eines pot convertir una fallada per 2 o menys en èxit.",
+        "checks": [{"name": "Forçar una porta", "ability": "Strength (Athletics)", "dc": 15}, {"name": "Recordar una drecera", "ability": "Intelligence (Investigation)", "dc": 14}, {"name": "Nedar amb equip", "ability": "Constitution check", "dc": 13}, {"name": "Alliberar un mecanisme", "ability": "Dexterity (Thieves' Tools)", "dc": 15}],
+        "twists": ["Una porta segura ara és sota l'aigua.", "Un NPC queda enrere.", "La llum principal s'apaga.", "Una recompensa pesada frena el portador."], "success": "Escapen amb tot allò que hagin decidit salvar.", "failure": "Escapen per una sortida inferior i cadascú paga un cost acordat."}
+    },
+    {
+      "id": "hb:jungle:minigame:idol-alignment", "category": "minigame", "name": "Alineació dels ídols",
+      "summary": "Puzle cooperatiu on quatre ídols canvien de posició quan ningú els mira.",
+      "terrains": ["ruins", "dungeon", "jungle"], "min_level": 2, "max_level": 12, "difficulty": 3, "tags": ["puzzle", "observation", "team"],
+      "data": {"target": 4, "danger_max": 3, "round_limit": 4, "setup": "A cada ronda, el grup assigna qui observa, qui mou i qui interpreta. Una persona no pot cobrir dos rols.",
+        "checks": [{"name": "Observar els canvis", "ability": "Wisdom (Perception)", "dc": 13}, {"name": "Interpretar els glifs", "ability": "Intelligence (Religion or History)", "dc": 14}, {"name": "Moure un ídol", "ability": "Strength check", "dc": 12}, {"name": "Enganyar el mecanisme", "ability": "Dexterity (Sleight of Hand)", "dc": 15}],
+        "twists": ["Dos ídols intercanvien ombres.", "Un glif descriu el present, no el passat.", "El pedestal comença a enfonsar-se."], "success": "La combinació obre un accés i revela el significat dels ídols.", "failure": "S'obre una ruta alternativa amb un guardià o cost."}
+    },
+    {
+      "id": "hb:jungle:minigame:predator-stalk", "category": "minigame", "name": "Caçats entre la boira",
+      "summary": "Joc de tensió per detectar, despistar o atreure un depredador sense combat obligatori.",
+      "terrains": ["jungle", "swamp", "forest"], "min_level": 3, "max_level": 14, "difficulty": 4, "tags": ["stealth", "predator", "choice"],
+      "data": {"target": 5, "danger_max": 3, "round_limit": 5, "setup": "El depredador avança amb cada fallada. Els personatges poden obtenir progrés escapant o preparant una emboscada.",
+        "checks": [{"name": "Llegir rastres", "ability": "Wisdom (Survival)", "dc": 14}, {"name": "Moure's en silenci", "ability": "Group Dexterity (Stealth)", "dc": 13}, {"name": "Crear una falsa pista", "ability": "Intelligence (Nature)", "dc": 15}, {"name": "Protegir la rereguarda", "ability": "Wisdom (Perception)", "dc": 14}],
+        "twists": ["El vent canvia.", "Apareixen petjades de dues criatures.", "Un company sent el seu propi nom.", "La ruta segura passa pel cau."], "success": "Escapen, localitzen el cau o comencen un combat amb avantatge narratiu.", "failure": "El depredador tria el lloc i moment de l'encontre."}
+    },
+    {
+      "id": "hb:jungle:minigame:ritual-disruption", "category": "minigame", "name": "Interrompre la Pluja Buida",
+      "summary": "Repte mixt de combat i habilitats per desactivar quatre focus rituals abans de completar-se el cant.",
+      "terrains": ["ruins", "jungle", "mountain"], "min_level": 5, "max_level": 16, "difficulty": 5, "tags": ["ritual", "combat", "clock"],
+      "data": {"target": 6, "danger_max": 4, "round_limit": 4, "setup": "Al final de cada ronda sense progrés, el perill augmenta. Destruir un focus és possible, però pot provocar una complicació.",
+        "checks": [{"name": "Desxifrar un focus", "ability": "Intelligence (Arcana or Religion)", "dc": 16}, {"name": "Redirigir l'aigua", "ability": "Wisdom (Nature)", "dc": 15}, {"name": "Trencar un focus", "ability": "Attack vs AC 17; 18 HP", "dc": 17}, {"name": "Trencar el cant", "ability": "Charisma (Performance or Intimidation)", "dc": 16}],
+        "twists": ["Un focus està unit a un innocent.", "La pluja cau cap amunt.", "Un focus completat cura els guardians.", "El ritual protegeix una comunitat llunyana."], "success": "El ritual s'atura o es redirigeix segons les decisions del grup.", "failure": "La tempesta s'allibera i crea una nova amenaça de campanya."}
+    },
+    {
+      "id": "hb:jungle:minigame:rapids", "category": "minigame", "name": "Ràpids de les Tres Boques",
+      "summary": "Descens amb balsa on el grup reparteix navegació, equilibri, vigilància i reparacions.",
+      "terrains": ["river", "jungle", "swamp"], "min_level": 1, "max_level": 12, "difficulty": 3, "tags": ["river", "vehicle", "roles"],
+      "data": {"target": 5, "danger_max": 3, "round_limit": 5, "setup": "Cada ronda cal cobrir almenys dos rols diferents. Repetir el mateix líder augmenta la seva CD en 1.",
+        "checks": [{"name": "Llegir el corrent", "ability": "Wisdom (Survival)", "dc": 13}, {"name": "Mantenir l'equilibri", "ability": "Dexterity (Acrobatics)", "dc": 12}, {"name": "Apartar obstacles", "ability": "Strength (Athletics)", "dc": 13}, {"name": "Reparar la balsa", "ability": "Intelligence or carpenter tools", "dc": 14}],
+        "twists": ["La ruta es divideix en tres boques.", "Una caixa cau per la borda.", "Hi ha una corda antiga entre dues roques.", "Una criatura segueix la balsa sota l'aigua."], "success": "Arriben ràpidament i trien el punt de desembarcament.", "failure": "La balsa encalla en un hex inesperat i es perd un recurs."}
+    }
+  ]
+}

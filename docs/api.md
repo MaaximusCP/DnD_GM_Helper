@@ -1,4 +1,4 @@
-# API local 1.1
+# API local 1.3
 
 Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interactiva completa a `/docs`.
 
@@ -104,6 +104,12 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `GET` | `/reference/meta` | Versió, llicència i recompte del catàleg SRD local |
 | `GET` | `/reference?category=...&q=...` | Cerca paginada al catàleg SRD |
 | `GET` | `/reference/item/{id}` | Fitxa estructurada completa d'una entrada SRD |
+| `GET` | `/homebrew/meta` | Manifest agregat, llicències i recompte dels packs homebrew locals |
+| `GET` | `/homebrew?category=...&terrain=...&level=...&pack_id=...` | Cerca filtrada per categoria, terreny, nivell, dificultat i pack |
+| `GET` | `/homebrew/item/{id}` | Fitxa estructurada d'un recurs homebrew del pack local |
+| `GET` | `/homebrew/packs` | Packs inclosos, privats, vàlids o amb error de contracte |
+| `POST` | `/homebrew/packs/import` | Valida i importa un JSON local de màxim 1 MB |
+| `DELETE` | `/homebrew/packs/{id}?confirm=true` | Elimina un pack privat; el pack inclòs està protegit |
 
 Exemple per analitzar un fet:
 

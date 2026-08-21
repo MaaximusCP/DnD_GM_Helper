@@ -2338,3 +2338,38 @@ La vertical slice i els mòduls locals previstos fins a la versió 1.1 ja estan 
 - panell de consulta de condicions pensat per a l'ús durant la sessió.
 
 La sincronització cloud, l'OCR i la cerca semàntica continuen sent extensions opcionals. El nucli 1.1 no les necessita.
+
+---
+
+# 47. Estat implementat: versió 1.2, Laboratori d'aventures
+
+La versió 1.2 amplia el nucli local amb un paquet homebrew original orientat a expedicions de selva, sense reproduir cap aventura o bestiari comercial:
+
+- 8 enemics amb CA, PG, CR orientatiu, accions, tàctica i recursos recuperables;
+- 8 temples modulars amb ganxo, aproximació, sales, guardià, secret, recompensa i escalada;
+- 12 situacions amb decisions, proves, CD, èxit, fallada i continuació;
+- 6 minijocs amb objectiu, límit de perill, rondes, proves i desenllaç;
+- cerca i filtres per categoria, terreny, nivell i dificultat;
+- integració d'enemics amb Combat Assistant;
+- conversió de temples i situacions en escenes persistents;
+- conversió de minijocs en clocks persistents amb tirades i activitat auditable.
+
+El pack és dades substituïbles i queda separat del catàleg SRD i dels documents privats del DM. Això permet afegir en el futur nous biomes o aventures pròpies sense canviar el motor.
+
+---
+
+# 48. Estat implementat: versió 1.3, composició i packs privats
+
+La versió 1.3 converteix el Laboratori en una eina de preparació de sessió ampliable:
+
+- compositor d'expedicions amb enemic, temple, situació i minijoc compatibles;
+- desament del conjunt com una escena persistent i activitat de planificació;
+- estimació de dificultat amb llindars XP, multiplicadors de grups d'enemics i mida del grup;
+- favorits locals per campanya i filtre dedicat;
+- deep links per obrir directament una categoria i un recurs;
+- descoberta i selecció de diversos packs;
+- importació JSON privada amb validació, escriptura atòmica i límit d'1 MB;
+- protecció del pack inclòs i eliminació explícita només de packs privats;
+- origen i llicència visibles a cada recurs.
+
+Els packs privats continuen fora del repositori, mentre que qualsevol escena, clock o combatent aplicat passa a formar part de l'estat SQLite de la campanya.

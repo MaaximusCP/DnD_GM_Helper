@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     database_path: Path = PROJECT_ROOT / "data" / "campaign.db"
     library_path: Path = PROJECT_ROOT / "library"
+    homebrew_path: Path = PROJECT_ROOT / "data" / "homebrew_packs"
     max_upload_mb: int = 40
     llm_provider: str = "mock"
     llm_base_url: str = "http://localhost:11434"

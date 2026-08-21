@@ -80,3 +80,7 @@ export type ReferenceItem = {
   summary:string; tags:string[]; data:Record<string, unknown>; source:string; license:string
 }
 export type ReferenceSearch = { total:number; offset:number; limit:number; items:ReferenceItem[] }
+export type HomebrewCategory = 'enemy'|'temple'|'situation'|'minigame'
+export type HomebrewPack = {id:string;name:string;version:string;license:string;counts:Partial<Record<HomebrewCategory,number>>;item_count:number;bundled:boolean;status:'ready'|'invalid';error:string}
+export type HomebrewItem = {id:string;category:HomebrewCategory;name:string;summary:string;terrains:string[];min_level:number;max_level:number;difficulty:number;tags:string[];data:Record<string,unknown>;pack_id:string;pack_name:string}
+export type HomebrewSearch = {total:number;offset:number;limit:number;items:HomebrewItem[]}

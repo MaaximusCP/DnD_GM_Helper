@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,7 +27,8 @@ class APITests(unittest.TestCase):
         app.dependency_overrides[get_content_repository] = lambda: ContentRepository(database)
         app.dependency_overrides[get_simulation_repository] = lambda: SimulationRepository(database)
         app.dependency_overrides[get_settings] = lambda: Settings(
-            database_path=database.path, library_path=Path(self.temp_dir.name) / "library"
+            database_path=database.path, library_path=Path(self.temp_dir.name) / "library",
+            homebrew_path=Path(self.temp_dir.name) / "homebrew_packs",
         )
         app.dependency_overrides[get_backup_service] = lambda: BackupService(database, Path(self.temp_dir.name) / "backups")
         self.client = TestClient(app)
@@ -514,6 +516,58 @@ class APITests(unittest.TestCase):
         self.assertEqual(conditions.status_code, 200)
         self.assertGreaterEqual(conditions.json()["total"], 15)
         self.assertTrue(any(item["key"] == "poisoned" for item in conditions.json()["items"]))
+
+    def test_v12_original_jungle_homebrew_catalog(self):
+        metadata = self.client.get("/api/homebrew/meta")
+        self.assertEqual(metadata.status_code, 200)
+        self.assertEqual(metadata.json()["license"], "MIT")
+        self.assertEqual(metadata.json()["counts"], {
+            "enemy": 8, "temple": 8, "situation": 12, "minigame": 6,
+        })
+        catalog = self.client.get("/api/homebrew", params={"limit": 100})
+        self.assertEqual(catalog.status_code, 200)
+        self.assertEqual(catalog.json()["total"], 34)
+        items = catalog.json()["items"]
+        self.assertEqual(len({item["id"] for item in items}), 34)
+        self.assertTrue(all(1 <= item["min_level"] <= item["max_level"] <= 20 for item in items))
+        self.assertTrue(all(1 <= item["difficulty"] <= 5 for item in items))
+        enemies = self.client.get("/api/homebrew", params={
+            "category": "enemy", "terrain": "jungle", "level": 4, "limit": 100,
+        })
+        self.assertEqual(enemies.status_code, 200)
+        self.assertGreaterEqual(enemies.json()["total"], 3)
+        self.assertTrue(all(item["min_level"] <= 4 <= item["max_level"] for item in enemies.json()["items"]))
+        minigame = self.client.get("/api/homebrew/item/hb:jungle:minigame:rapids")
+        self.assertEqual(minigame.status_code, 200)
+        self.assertEqual(minigame.json()["data"]["target"], 5)
+        self.assertEqual(self.client.get("/api/homebrew/item/hb:jungle:missing").status_code, 404)
+        self.assertEqual(self.client.get("/api/homebrew", params={"level": 21}).status_code, 422)
+
+        custom_pack = {
+            "format_version": 1, "id": "test-pack", "name": "Pack de prova",
+            "version": "1.0.0", "license": "MIT", "items": [{
+                "id": "hb:test:situation:bridge", "category": "situation",
+                "name": "El pont quiet", "summary": "Una situació local de prova.",
+                "terrains": ["jungle"], "min_level": 1, "max_level": 20,
+                "difficulty": 2, "tags": ["bridge"], "data": {"prompt": "Creuar o esperar."},
+            }],
+        }
+        imported = self.client.post("/api/homebrew/packs/import", files={
+            "file": ("test-pack.json", json.dumps(custom_pack).encode(), "application/json"),
+        })
+        self.assertEqual(imported.status_code, 201)
+        self.assertFalse(imported.json()["bundled"])
+        self.assertEqual(self.client.get("/api/homebrew", params={"pack_id": "test-pack"}).json()["total"], 1)
+        self.assertEqual(self.client.post("/api/homebrew/packs/import", files={
+            "file": ("test-pack.json", json.dumps(custom_pack).encode(), "application/json"),
+        }).status_code, 422)
+        duplicate_item_pack = {**custom_pack, "id": "second-pack", "name": "Segon pack"}
+        self.assertEqual(self.client.post("/api/homebrew/packs/import", files={
+            "file": ("second-pack.json", json.dumps(duplicate_item_pack).encode(), "application/json"),
+        }).status_code, 422)
+        self.assertEqual(self.client.delete("/api/homebrew/packs/jungle-expedition-core?confirm=true").status_code, 409)
+        self.assertEqual(self.client.delete("/api/homebrew/packs/test-pack").status_code, 422)
+        self.assertEqual(self.client.delete("/api/homebrew/packs/test-pack?confirm=true").status_code, 204)
 
 
 if __name__ == "__main__":

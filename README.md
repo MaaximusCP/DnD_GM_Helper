@@ -4,7 +4,7 @@ Assistent local per a directors de joc de D&D 5e. Manté l'estat de la campanya,
 
 ![Dashboard local de GM AI](docs/assets/dashboard.png)
 
-Aquest repositori implementa la **versió 1.1 local-first** definida a [`projecte_gm_ai.md`](projecte_gm_ai.md):
+Aquest repositori implementa la **versió 1.3 local-first** definida a [`projecte_gm_ai.md`](projecte_gm_ai.md):
 
 - dashboard de sessió usable al navegador;
 - una campanya de demostració, una localització, una facció i tres NPC;
@@ -59,6 +59,14 @@ Aquest repositori implementa la **versió 1.1 local-first** definida a [`project
 - visibilitat i obertura directa de fonts locals, conservant `source_id` i pàgina d'origen;
 - safata de daus de campanya amb notació `NdX`, modificadors, CD, avantatge/desavantatge i historial SQLite;
 - referència ràpida de les 15 condicions SRD per consultar-les durant la sessió;
+- Laboratori de selva amb 34 recursos homebrew originals: 8 enemics, 8 temples, 12 situacions i 6 minijocs;
+- filtres del Laboratori per terreny, nivell i dificultat, cerca i selecció aleatòria segura;
+- aplicació directa d'enemics al combat, temples i situacions a escenes, i minijocs a clocks persistents;
+- minijocs amb tirades, CD, progrés, perill, rondes i historial d'activitat;
+- compositor procedural que combina enemic, temple, situació i minijoc i ho desa com una escena completa;
+- estimació de dificultat d'encontres per pressupost XP, quantitat d'enemics i mida del grup;
+- favorits locals, URLs profundes i selector de packs del Laboratori;
+- importació validada de packs JSON privats, amb IDs únics i sense incloure'ls a Git;
 - API REST documentada automàticament amb OpenAPI.
 
 > El projecte no distribueix text, mapes, personatges ni altres continguts de cap aventura comercial. Pots importar-hi el contingut que tinguis dret a utilitzar.
@@ -159,6 +167,22 @@ El contingut procedeix de l'SRD 5.1 sota CC-BY-4.0. Consulta [`NOTICE-SRD.md`](N
 
 El mòdul `Eines de taula` permet fer tirades normals o d20 amb avantatge/desavantatge, indicar una CD opcional i conservar les darreres tirades per campanya. També inclou la referència local de condicions de l'SRD. El comportament, els límits i les fonts de regles es documenten a [`docs/session-toolkit.md`](docs/session-toolkit.md).
 
+## Laboratori de selva
+
+`Laboratori de selva` és un pack local de contingut original i reutilitzable. Es pot obrir directament amb `http://localhost:8000/?view=homebrew` o des del menú lateral. No necessita Internet, LLM ni documents comercials.
+
+| Encontre i pressupost XP | Temple modular |
+|---|---|
+| ![Enemic homebrew amb estimació de perill](docs/assets/jungle-encounter-budget.png) | ![Temple modular de selva](docs/assets/jungle-temple.png) |
+
+| Minijoc persistent | Compositor d'expedicions |
+|---|---|
+| ![Minijoc amb progrés, perill i rondes](docs/assets/jungle-minigame.png) | ![Expedició composta amb quatre recursos](docs/assets/jungle-expedition.png) |
+
+Els recursos no modifiquen la campanya fins que el DM els aplica: els enemics es poden enviar a un combat, els temples i situacions es preparen com a escenes i els minijocs creen un clock persistent. `Compondre expedició` combina les quatre categories i desa el resultat al planificador només després de revisar-lo.
+
+Els packs JSON propis s'importen des del desplegable `Gestionar packs locals`, es validen abans de desar-se i queden a `data/homebrew_packs/`, fora de Git. El format, la llicència i la guia d'ampliació són a [`docs/homebrew-packs.md`](docs/homebrew-packs.md) i [`NOTICE-HOMEBREW.md`](NOTICE-HOMEBREW.md).
+
 ## Encounter i Reward Engine
 
 Els dos generadors permeten escollir terreny i dificultat de l'1 al 5. Els encounters també consideren nivell, mida del grup, tipus i estat del món. Les recompenses poden relacionar-se amb l'últim encounter i funcionar sense fortuna, amb una tirada d20 automàtica o amb el resultat introduït manualment perquè els jugadors tirin els daus a taula.
@@ -168,13 +192,15 @@ Les opcions inicials són petites deliberadament. Les taules i entrades custom e
 ## Validació
 
 ```powershell
-cd backend
-python -m unittest discover -s tests -v
-python -m compileall app tests
+# Des de l'arrel del repositori GM_AI
+$env:PYTHONPATH='backend'
+backend\.venv\Scripts\python.exe -m pytest backend\tests -q
+backend\.venv\Scripts\python.exe -m compileall -q backend\app backend\tests
 ```
 
 ```powershell
 cd frontend
+npm run lint
 npm run build
 ```
 

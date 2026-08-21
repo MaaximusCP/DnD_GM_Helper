@@ -12,6 +12,8 @@
 8. Els NPC actius només creen propostes; el DM continua sent l'únic que pot aplicar conseqüències.
 9. Un fragment documental no esdevé canònic fins que el DM el revisa i l'aprova.
 10. Les utilitats deterministes de sessió, com els daus, no depenen del LLM i en conserven l'historial per campanya.
+11. El catàleg SRD, els documents privats i els packs homebrew són capes separades amb origen i llicència visibles.
+12. Cap pack importat entra al catàleg fins que supera validació estructural, rangs, recomptes i unicitat d'identificadors.
 
 ## Flux d'un esdeveniment
 

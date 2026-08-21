@@ -17,6 +17,7 @@ frontend/dist/
 data/*.db
 data/*.db-*
 data/*.pid
+data/homebrew_packs/**
 backups/*
 !backups/.gitkeep
 library/**
