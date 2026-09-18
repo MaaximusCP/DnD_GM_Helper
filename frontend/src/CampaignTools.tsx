@@ -101,6 +101,7 @@ export function HexcrawlStudio({data,changed}:{data:Dashboard;changed:()=>void})
   const [tab,setTab]=useState<HexTab>('map')
   const [selectedId,setSelectedIdState]=useState(data.expedition_state.current_hex_id??data.hex_cells[0]?.id??'')
   const selected=data.hex_cells.find(x=>x.id===selectedId)
+  const hexAdventures=data.campaign_records.filter(x=>x.kind==='adventure'&&x.data.hex_id===selectedId&&x.status!=='completed')
   const [draft,setDraft]=useState<HexCell|null>(selected??null)
   const setSelectedId=(id:string)=>{setSelectedIdState(id);setDraft(data.hex_cells.find(x=>x.id===id)??null)}
   const [form,setForm]=useState({q:2,r:0,title:'Nou hex',terrain:'jungle'})
@@ -127,6 +128,7 @@ export function HexcrawlStudio({data,changed}:{data:Dashboard;changed:()=>void})
     <div className="studio-heading"><div><span className="eyebrow">Exploració modular</span><h1>Hexcrawl de Chult</h1><p>Des d’un mapa lleuger fins a supervivència completa, regla per regla.</p></div><MapPinned/></div>
     <div className="tool-tabs"><button className={tab==='map'?'active':''} onClick={()=>setTab('map')}><MapPinned/>Mapa</button><button className={tab==='travel'?'active':''} onClick={()=>setTab('travel')}><Footprints/>Viatjar</button><button className={tab==='rules'?'active':''} onClick={()=>setTab('rules')}><Shield/>Regles</button><button className={tab==='log'?'active':''} onClick={()=>setTab('log')}><BookLock/>Diari</button></div>
     {toolError&&<div className="alert dismissible" onClick={()=>setToolError('')}>{toolError}<X/></div>}
+    {tab==='map'&&hexAdventures.length>0&&<section className="studio-card"><h2>Aventures en aquest hex</h2>{hexAdventures.map(a=><p key={a.id}><a href={`?view=adventures&adventure=${encodeURIComponent(a.id)}`}>{a.title} →</a> · {a.status==='active'?'En joc':'Preparada'}</p>)}</section>}
     {tab==='rules'&&<section className="studio-card risk-rules"><h2>Risc i nivell d'alerta</h2><div><Toggle label="Risc del terreny" description="Augmenta la DC de navegació, la probabilitat d'encounter i la dificultat." checked={data.hexcrawl_settings.track_risk} onChange={v=>void patchSettings({track_risk:v})}/><Toggle label="Alerta dinàmica" description="El soroll, perdre's i els encounters fan que la zona reaccioni al grup." checked={data.hexcrawl_settings.track_alert} onChange={v=>void patchSettings({track_alert:v})}/><Toggle label="Reducció d'alerta" description="El ritme lent i els campaments segurs poden reduir-la gradualment." checked={data.hexcrawl_settings.alert_decay} onChange={v=>void patchSettings({alert_decay:v})}/></div></section>}
     {tab==='map'&&<div className="hexcrawl-layout">
       <section className="hex-map-card"><div className="map-toolbar"><span><Navigation/> Posició: {data.hex_cells.find(x=>x.id===data.expedition_state.current_hex_id)?.title??'Sense definir'}</span><span><Eye/> {data.hex_cells.filter(x=>x.discovery!=='hidden').length} coneguts</span><span><EyeOff/> {data.hex_cells.filter(x=>x.discovery==='hidden').length} ocults</span></div><HexMap hexes={data.hex_cells} currentId={data.expedition_state.current_hex_id} selectedId={selectedId} onSelect={setSelectedId}/><div className="map-notice">Selecciona un hex per editar-lo. Les eines de zona i creació queden plegades fins que les necessitis.</div></section>
@@ -155,7 +157,7 @@ function TravelResult({item,onPrepareCombat}:{item:TravelLog;onPrepareCombat?:(e
 }
 
 export function CombatAssistant({data,changed}:{data:Dashboard;changed:()=>void}){
-  const [combatId,setCombatId]=useState(data.combats.find(x=>x.status==='active')?.id??data.combats[0]?.id??'')
+  const [combatId,setCombatId]=useState(()=>{const requested=new URLSearchParams(location.search).get('combat');return data.combats.find(x=>x.id===requested)?.id??data.combats.find(x=>x.status==='active')?.id??data.combats[0]?.id??''})
   const combat=data.combats.find(x=>x.id===combatId)
   const [combatName,setCombatName]=useState('Nou combat')
   const [encounterId,setEncounterId]=useState('')
@@ -167,12 +169,14 @@ export function CombatAssistant({data,changed}:{data:Dashboard;changed:()=>void}
   const [combatError,setCombatError]=useState('')
   const ordered=useMemo(()=>combat?.combatants??[],[combat]);const current=ordered[combat?.turn_index??0]
   const pendingEncounters=data.encounters.filter(item=>item.status==='generated'&&['combat','mixed'].includes(item.encounter_type)&&!data.combats.some(combatItem=>combatItem.encounter_id===item.id))
+  const linkedAdventure=data.campaign_records.find(item=>item.kind==='adventure'&&item.data.combat_id===combatId)
   useEffect(()=>{if(combatId)void api.combatLog(combatId).then(setLogs)},[combatId,data.combats])
   const refresh=()=>changed()
   const addManual=async()=>{if(!combat||name.trim().length<2)return;await api.addCombatant(combat.id,{name,kind,initiative,initiative_bonus:bonus,armor_class:ac,max_hp:hp,actions:[{name:action||'Atac',description:'Acció manual.',source:'manual'}]});setName('');refresh()}
   const searchMonsters=async()=>{const result=await api.reference(monsterQuery,'monsters');setMonsterResults(result.items)}
   const prepareEncounter=async(id:string)=>{setCombatError('');try{const created=await api.encounterToCombat(id,quantity);setCombatId(created.id);refresh()}catch(e){setCombatError(e instanceof Error?e.message:'No s’ha pogut preparar l’encounter')}}
   return <div className="studio-page">
+    {linkedAdventure&&<p><a href={`?view=adventures&adventure=${encodeURIComponent(linkedAdventure.id)}`}>← Tornar a l'aventura: {linkedAdventure.title}</a> · Activa els reforços des de la seva escena.</p>}
     <div className="studio-heading"><div><span className="eyebrow">Control de la trobada</span><h1>Assistent de combat</h1><p>Iniciativa, vida, condicions, recursos d’acció i registre de tirades.</p></div><div className="swords-mark"><Shield/><Dices/></div></div>
     {combatError&&<div className="alert dismissible" onClick={()=>setCombatError('')}>{combatError}<X/></div>}
     {pendingEncounters.length>0&&<details className="encounter-queue studio-card"><summary><Swords/> Encounters pendents <b>{pendingEncounters.length}</b></summary><div className="queue-controls"><label>Enemics per defecte<input type="number" min="1" max="20" value={quantity} onChange={e=>setQuantity(Number(e.target.value))}/></label></div>{pendingEncounters.map(item=><article key={item.id}><span><strong>{item.title}</strong><small>{item.terrain} · dificultat {item.difficulty}/5 · nivell {item.party_level}</small></span><button onClick={()=>void prepareEncounter(item.id)}><Sparkles/> Preparar automàticament</button></article>)}</details>}

@@ -11,12 +11,13 @@ import { OperationsStudio } from './OperationsStudio'
 import { SimulationStudio } from './SimulationStudio'
 import { SessionToolkit } from './SessionToolkit'
 import { JungleToolkit } from './JungleToolkit'
+import { AdventureStudio } from './AdventureStudio'
 import type {
   Campaign, CampaignTemplate, Dashboard, DocumentResult, Encounter, EventProposal, Faction,
   GenerationEntry, Knowledge, Location, NPC, NPCCreate, ReferenceItem, Reward,
 } from './types'
 
-type View = 'session'|'tools'|'homebrew'|'operations'|'simulation'|'world'|'party'|'players'|'knowledge'|'hexcrawl'|'combat'|'factions'|'library'|'reference'|'tables'
+type View = 'session'|'tools'|'adventures'|'homebrew'|'operations'|'simulation'|'world'|'party'|'players'|'knowledge'|'hexcrawl'|'combat'|'factions'|'library'|'reference'|'tables'
 type GeneratorKind = 'encounter'|'reward'
 type ConfigurableModule = View|'encounter'|'reward'
 type UIPreferences = {
@@ -29,10 +30,11 @@ type UIPreferences = {
 
 const UI_STORAGE_KEY='gm-ai-ui-preferences-v1'
 const defaultPreferences:UIPreferences={
-  modules:{session:true,tools:true,homebrew:true,operations:true,simulation:true,world:true,party:true,players:true,knowledge:true,hexcrawl:true,combat:true,factions:true,library:true,reference:true,tables:true,encounter:true,reward:true},
+  modules:{session:true,tools:true,adventures:true,homebrew:true,operations:true,simulation:true,world:true,party:true,players:true,knowledge:true,hexcrawl:true,combat:true,factions:true,library:true,reference:true,tables:true,encounter:true,reward:true},
   compact:false,showContextPanel:true,reduceMotion:false,largeText:false,
 }
 const navItems:[View,typeof LayoutDashboard,string,string][]=[
+  ['adventures',BookOpen,'Aventures','Preparar escenes, combats mixtos i onades'],
   ['session',LayoutDashboard,'Sessió','Dashboard, NPC i cronologia'],['tools',Dices,'Eines de taula','Daus, historial i condicions SRD'],['homebrew',Landmark,'Laboratori de selva','Enemics, temples, situacions i minijocs'],['world',Map,'Món','Campanya, grup i localitzacions'],
   ['operations',FileText,'Operacions','Missions, calendari, clocks i planificació'],
   ['simulation',Bot,'Simulació','Agendes i accions dels NPC actius'],
@@ -205,6 +207,7 @@ export default function App() {
   if(!data)return <main className="loading"><Sparkles/><span>Carregant el món…</span></main>
   if(view==='tools')return <div className={`tool-standalone ${uiClass}`}><header><div className="brand-mark">GM</div><div><span>Campaign Engine</span><strong>{data.campaign.name}</strong></div><button onClick={()=>setView('session')}><ChevronRight className="back-chevron"/> Tornar a la campanya</button></header><main><SessionToolkit data={data}/></main></div>
   if(view==='homebrew')return <div className={`tool-standalone ${uiClass}`}><header><div className="brand-mark">GM</div><div><span>Campaign Engine</span><strong>{data.campaign.name}</strong></div><button onClick={()=>setView('session')}><ChevronRight className="back-chevron"/> Tornar a la campanya</button></header><main><JungleToolkit data={data} changed={()=>void load()}/></main></div>
+  if(view==='adventures')return <div className={`tool-standalone ${uiClass}`}><header><div className="brand-mark">GM</div><div><span>Campaign Engine</span><strong>{data.campaign.name}</strong></div><button onClick={()=>setView('session')}><ChevronRight className="back-chevron"/> Tornar a la campanya</button></header><main><AdventureStudio key={data.campaign.id} data={data} changed={()=>void load()}/></main></div>
   if(view==='operations'||view==='simulation'||view==='party'||view==='players'||view==='knowledge'||view==='hexcrawl'||view==='combat')return <div className={`tool-standalone ${uiClass}`}><header><div className="brand-mark">GM</div><div><span>Campaign Engine</span><strong>{data.campaign.name}</strong></div><button onClick={()=>setView('session')}><ChevronRight className="back-chevron"/> Tornar a la campanya</button></header><main>{view==='operations'&&<OperationsStudio data={data} changed={()=>void load()}/>} {view==='simulation'&&<SimulationStudio data={data} changed={()=>void load()}/>} {view==='party'&&<PartyManager data={data} changed={()=>void load()}/>} {view==='players'&&<PlayerViewManager data={data} changed={()=>void load()}/>} {view==='knowledge'&&<KnowledgeLayers data={data} changed={()=>void load()}/>} {view==='hexcrawl'&&<HexcrawlStudio data={data} changed={()=>void load()}/>} {view==='combat'&&<CombatAssistant data={data} changed={()=>void load()}/>}</main></div>
   if(view==='reference')return <div className={`catalog-standalone ${uiClass}`}><header><div className="brand-mark">GM</div><div><span>Campaign Engine</span><strong>{data.campaign.name}</strong></div><button onClick={()=>setView('session')}><ChevronRight className="back-chevron"/> Tornar a la campanya</button></header><main><ReferenceCatalog key={data.campaign.id} data={data} changed={()=>void load()}/></main></div>
   return <div className={`app-shell ${uiClass}`}>

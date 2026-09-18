@@ -2373,3 +2373,18 @@ La versió 1.3 converteix el Laboratori en una eina de preparació de sessió am
 - origen i llicència visibles a cada recurs.
 
 Els packs privats continuen fora del repositori, mentre que qualsevol escena, clock o combatent aplicat passa a formar part de l'estat SQLite de la campanya.
+
+---
+
+# 49. Estat implementat: versió 1.4, aventures connectades
+
+- Constructor amb sis guions originals, selecció de situació/temple/minijoc i seqüència d'escenes persistent.
+- Trobades mixtes SRD/homebrew amb quantitats, fins a cinc onades i pressupost 2014 calculat al servidor.
+- Mode «A taula» amb una aventura activa per campanya, notes privades i continuïtat després de recarregar.
+- Combat creat en arribar a l'escena, incorporació opcional dels personatges i reforços sota ordre del DM.
+- Vincle amb l'hexcrawl, alerta opcional aplicada una sola vegada i confirmació si el grup és lluny.
+- Tirades de minijoc manuals o automàtiques amb modificador, CD i historial; resolució sota control del DM.
+- Transaccions atòmiques, revisió optimista, exportació/importació i exclusions de la pantalla pública.
+- Guia d'ús, atribució de fonts, proves backend i recorregut real de navegador amb captures reproduïbles.
+
+No inclou branques d'escena, editor de plans desats ni adjudicació automàtica de recompenses. Aquests punts continuen com a ampliacions futures, sense dependències cloud.

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "rain-debt", "title": "El deute de la pluja", "terrain": "jungle", "level_hint": "Nivells 2–4 · negociació i exploració",
+    "description": "Una cartògrafa ofereix una ruta segura a canvi de recuperar una campana que només sona sota terra. Tres famílies reclamen la campana: cadascuna ha pagat amb un record. Pista inicial: les granotes callen cada vegada que algú menteix. Gir: el temple no vol un sacrifici, sinó que algú reconegui un deute. Sortida pacífica: acordar torns per compartir l'aigua. Recompensa suggerida: refugi segur durant tres nits i una guia local; no s'atorga automàticament.",
+    "situation_id": "hb:jungle:situation:moon-flowers", "temple_id": "hb:jungle:temple:seven-drips", "minigame_id": "hb:jungle:minigame:flooded-temple",
+    "enemy_groups": [{"resource_id":"hb:jungle:enemy:glass-frond","quantity":2,"wave":1},{"resource_id":"hb:jungle:enemy:root-serpent","quantity":1,"wave":2}]
+  },
+  {
+    "id": "borrowed-dawn", "title": "L'alba prestada", "terrain": "ruins", "level_hint": "Nivells 4–6 · misteri i decisions",
+    "description": "L'expedició desperta amb dues ombres per persona. Un astrònom desaparegut havia comprat una hora de llum a un guardià, però la factura arriba ara. Tres pistes: cera fresca sobre pedra antiga, una carta datada demà i ocells que volen enrere al reflex. El guardià accepta reparar el seu calendari en lloc de lluitar. Dilema: retornar l'hora salva el poble, però esborra el record d'una trobada. Botí suggerit: brúixola d'alba, objecte homebrew que una vegada al dia assenyala l'est durant un minut.",
+    "situation_id": "hb:jungle:situation:borrowed-camp", "temple_id": "hb:jungle:temple:green-hour", "minigame_id": "hb:jungle:minigame:idol-alignment",
+    "enemy_groups": [{"resource_id":"hb:jungle:enemy:mist-jaguar","quantity":1,"wave":1},{"resource_id":"hb:jungle:enemy:glass-frond","quantity":3,"wave":2}]
+  },
+  {
+    "id": "river-witness", "title": "El riu és testimoni", "terrain": "river", "level_hint": "Nivells 1–3 · travessa i rescat",
+    "description": "Una barca torna sola amb sis àpats intactes i una pedra calenta al timó. Els passatgers són vius, atrapats en una riba que només existeix al reflex. Cada testimoni recorda un nom diferent del barquer. Es pot arribar-hi apagant totes les llums i dient un record compartit. Fracassar no mata ningú: la riba deriva un hexàgon i el rescat costa temps. Recompensa suggerida: un favor de transport i una perla de riu de 25 gp, subjectes a aprovació del DM.",
+    "situation_id": "hb:jungle:situation:talking-ferry", "temple_id": "hb:jungle:temple:sunken-sun", "minigame_id": "hb:jungle:minigame:rapids",
+    "enemy_groups": [{"resource_id":"hb:jungle:enemy:ash-monkey","quantity":3,"wave":1}]
+  },
+  {
+    "id": "silent-procession", "title": "La processó sense noms", "terrain": "ruins", "level_hint": "Nivells 5–8 · temple i pactes",
+    "description": "Una processó porta màscares buides fins a un santuari. Cada màscara guarda la promesa incomplerta d'un viu. Una guia vol destruir la seva abans que la reconeguin. Pistes: la pols només cobreix les cares, els peus de pedra estan humits i la guia coneix una cançó prohibida. El guardià protegeix les promeses, no el tresor. Alternatives: complir un servei, confessar una mentida o tornar una màscara al seu amo. Recompensa suggerida: audiència amb un esperit que respon una pregunta sobre una ruta, sense revelar automàticament secrets als jugadors.",
+    "situation_id": "hb:jungle:situation:stone-procession", "temple_id": "hb:jungle:temple:echo-masks", "minigame_id": "hb:jungle:minigame:idol-alignment",
+    "enemy_groups": [{"resource_id":"hb:jungle:enemy:basalt-sentinel","quantity":1,"wave":1},{"resource_id":"hb:jungle:enemy:root-serpent","quantity":2,"wave":2}]
+  },
+  {
+    "id": "hive-treaty", "title": "El tractat de l'ambre", "terrain": "jungle", "level_hint": "Nivells 3–5 · faccions i recursos",
+    "description": "Un rusc ha tapat la resclosa que alimenta dos campaments rivals. L'apicultora vol salvar les larves; el cap de portadors exigeix obrir el pas avui. Pistes: marques de palanca humanes, recipients de mel buits i una corda tallada des de dins. Algú ha mogut el niu per cobrar un peatge. Negociar permet repartir la mel i construir un canal lateral. Si el combat comença, els reforços només arriben quan el DM activa l'onada. Recompensa suggerida: dues racions de mel i aliats per reparar equip, no efectes curatius automàtics.",
+    "situation_id": "hb:jungle:situation:amber-hive", "temple_id": "hb:jungle:temple:rainless-court", "minigame_id": "hb:jungle:minigame:canopy-crossing",
+    "enemy_groups": [{"resource_id":"hb:jungle:enemy:amber-blood-wasp","quantity":1,"wave":1},{"resource_id":"hb:jungle:enemy:amber-blood-wasp","quantity":1,"wave":2}]
+  },
+  {
+    "id": "root-parliament", "title": "El parlament sota les arrels", "terrain": "forest", "level_hint": "Nivells 6–9 · exploració social",
+    "description": "Tres arbres antics reclamen el mateix tros de bosc. Un parla pel passat, un pels habitants actuals i un pels qui encara no han nascut. El grup pot presentar proves recollides al viatge, oferir un servei concret o buscar una quarta proposta. No cal guanyar una tirada per tenir una bona idea. Una ombra vol que ningú recordi l'acord original. Pista decisiva: una pedra amb tres mans de mides diferents, totes contemporànies. Recompensa suggerida: dret de pas i una llavor que il·lumina suaument un campament durant una nit.",
+    "situation_id": "hb:jungle:situation:roots-vote", "temple_id": "hb:jungle:temple:root-vault", "minigame_id": null,
+    "enemy_groups": [{"resource_id":"hb:jungle:enemy:canopy-shadow","quantity":1,"wave":1}]
+  }
+]

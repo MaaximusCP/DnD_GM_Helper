@@ -1,3 +1,4 @@
+import type { Adventure, AdventureBudget, AdventureDraft, AdventureResource, AdventureTemplate, EnemyGroup } from './adventureTypes'
 import type {
   Campaign, Dashboard, DocumentResult, Encounter, EventProposal, Faction, GenerationEntry,
   GenerationTable, Knowledge, Location, NPC, NPCCreate, PartySettings, Reward, SearchResult, Session,
@@ -23,6 +24,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  adventureResources: () => request<AdventureResource[]>('/adventures/resources'),
+  adventureCheck: (id:string,expected_revision:number,check_index:number,modifier:number,d20:number|null) => request<Adventure>(`/adventures/${id}/check`,{method:'POST',body:JSON.stringify({expected_revision,check_index,modifier,d20})}),
+  adventureTemplates: () => request<AdventureTemplate[]>('/adventures/templates'),
+  adventureBudget: (campaign_id:string,enemy_groups:EnemyGroup[]) => request<AdventureBudget>('/adventures/budget',{method:'POST',body:JSON.stringify({campaign_id,enemy_groups})}),
+  createAdventure: (payload:AdventureDraft) => request<Adventure>('/adventures',{method:'POST',body:JSON.stringify(payload)}),
+  activateAdventure: (id:string,force=false) => request<Adventure>(`/adventures/${id}/activate`,{method:'POST',body:JSON.stringify({force})}),
+  adventureAction: (id:string,action:'advance'|'wave'|'note',expected_revision:number,note='',force=false) => request<Adventure>(`/adventures/${id}/${action}`,{method:'POST',body:JSON.stringify({expected_revision,note,force})}),
   campaigns: () => request<Campaign[]>('/campaigns'),
   dashboard: (campaignId: string) => request<Dashboard>(`/campaigns/${campaignId}`),
   createCampaign: (payload: {name:string; system:string; rules_profile:string; location_name:string}) => request<Campaign>('/campaigns', {method:'POST', body:JSON.stringify(payload)}),

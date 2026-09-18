@@ -111,6 +111,8 @@ Base URL: `http://localhost:8000/api`. FastAPI publica l'especificació interact
 | `POST` | `/homebrew/packs/import` | Valida i importa un JSON local de màxim 1 MB |
 | `DELETE` | `/homebrew/packs/{id}?confirm=true` | Elimina un pack privat; el pack inclòs està protegit |
 
+Les rutes del constructor i les transicions d'aventura es descriuen a [Aventures connectades](adventures.md#persistència-i-api). Totes les transicions llevat de l'activació requereixen `expected_revision` per evitar doble enviament.
+
 Exemple per analitzar un fet:
 
 ```json

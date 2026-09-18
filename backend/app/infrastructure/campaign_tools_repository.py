@@ -293,14 +293,14 @@ class CampaignToolsRepository:
             values["actions"] = json.dumps(values["actions"])
         with self.database.connect() as db:
             row = db.execute("SELECT * FROM combatants WHERE id=?", (item_id,)).fetchone()
+            if not row:
+                return None
             if row["character_id"]:
                 sync = {key: values[key] for key in ("current_hp", "max_hp", "temp_hp", "conditions") if key in values}
                 if "conditions" in sync and isinstance(sync["conditions"], list):
                     sync["conditions"] = json.dumps(sync["conditions"])
                 if sync:
                     db.execute(f"UPDATE characters SET {','.join(f'{key}=?' for key in sync)} WHERE id=?", (*sync.values(), row["character_id"]))
-            if not row:
-                return None
             previous_hp = row["current_hp"]
             if "current_hp" in values:
                 maximum = values.get("max_hp", row["max_hp"])

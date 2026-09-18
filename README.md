@@ -4,7 +4,7 @@ Assistent local per a directors de joc de D&D 5e. Manté l'estat de la campanya,
 
 ![Dashboard local de GM AI](docs/assets/dashboard.png)
 
-Aquest repositori implementa la **versió 1.3 local-first** definida a [`projecte_gm_ai.md`](projecte_gm_ai.md):
+Aquest repositori implementa la **versió 1.4.0 local-first** definida a [`projecte_gm_ai.md`](projecte_gm_ai.md):
 
 - dashboard de sessió usable al navegador;
 - una campanya de demostració, una localització, una facció i tres NPC;
@@ -67,6 +67,10 @@ Aquest repositori implementa la **versió 1.3 local-first** definida a [`project
 - estimació de dificultat d'encontres per pressupost XP, quantitat d'enemics i mida del grup;
 - favorits locals, URLs profundes i selector de packs del Laboratori;
 - importació validada de packs JSON privats, amb IDs únics i sense incloure'ls a Git;
+- constructor d'aventures amb sis plantilles originals, escenes connectades i mode «A taula»;
+- combats mixtos SRD/homebrew amb onades, pressupost 2014 calculat al servidor i nivells individuals;
+- aventures vinculades a hexàgons, alerta opcional i activació explícita sense moure ni revelar el grup;
+- notes privades i proves de minijoc amb d20 manual o automàtic, persistents i protegides contra doble enviament;
 - API REST documentada automàticament amb OpenAPI.
 
 > El projecte no distribueix text, mapes, personatges ni altres continguts de cap aventura comercial. Pots importar-hi el contingut que tinguis dret a utilitzar.
@@ -183,6 +187,33 @@ Els recursos no modifiquen la campanya fins que el DM els aplica: els enemics es
 
 Els packs JSON propis s'importen des del desplegable `Gestionar packs locals`, es validen abans de desar-se i queden a `data/homebrew_packs/`, fora de Git. El format, la llicència i la guia d'ampliació són a [`docs/homebrew-packs.md`](docs/homebrew-packs.md) i [`NOTICE-HOMEBREW.md`](NOTICE-HOMEBREW.md).
 
+## Novetats 1.4 · Aventures connectades
+
+Obre **Aventures** al menú o entra a [`http://localhost:8000/?view=adventures`](http://localhost:8000/?view=adventures). Funciona sense Azure, IA ni connexions externes. El mòdul es pot ocultar des de Configuració.
+
+1. Tria un dels sis punts de partida originals o escriu el teu ganxo.
+2. Combina situació, temple, minijoc i enemics SRD/homebrew. Ajusta quantitats i onades amb controls numèrics; el pressupost de dificultat es recalcula.
+3. Opcionalment vincula un hexàgon i l'increment d'alerta. **Desar no modifica el món.**
+4. A **A taula**, comença l'aventura i avança escena a escena. El combat es crea en arribar-hi; els reforços només entren quan ho demanes.
+5. Obre l'assistent de combat, registra tirades manuals o automàtiques i conserva les decisions al diari. Pots resoldre una trobada amb un pacte o una fugida.
+
+| Constructor i pressupost per onada | Escena de combat a taula |
+|---|---|
+| ![Constructor amb grup mixt SRD i homebrew, dues onades i pressupost 2014](docs/assets/adventure-builder.png) | ![Aventura activa amb progressió, reforços i accés al combat](docs/assets/adventure-session.png) |
+
+![Minijoc amb guia plegable, tirada física i registre del resultat](docs/assets/adventure-checks.png)
+
+<details>
+<summary>Exemple de la interfície mòbil</summary>
+
+<img src="docs/assets/adventure-mobile.png" alt="Constructor d'aventures a 390 píxels d'amplada" width="390" />
+
+</details>
+
+Hi ha una aventura activa per campanya. Tot el seu contingut és **només DM**; no passa automàticament a la pantalla dels jugadors. Les recompenses, els PX i les conseqüències narratives continuen requerint aprovació manual. Les tirades dels minijocs es registren, però el DM decideix rondes, objectius i resolució segons la guia de cada repte.
+
+Les regles de dificultat són les de **2014**, no les de 2024/5.2. Les onades se separen per al càlcul; fer-les coincidir pot augmentar el risc. Els nivells orientatius de les plantilles no garanteixen un combat equilibrat: revisa sempre el pressupost del teu grup. Guia, límits i fonts: [`docs/adventures.md`](docs/adventures.md).
+
 ## Encounter i Reward Engine
 
 Els dos generadors permeten escollir terreny i dificultat de l'1 al 5. Els encounters també consideren nivell, mida del grup, tipus i estat del món. Les recompenses poden relacionar-se amb l'últim encounter i funcionar sense fortuna, amb una tirada d20 automàtica o amb el resultat introduït manualment perquè els jugadors tirin els daus a taula.
@@ -204,6 +235,17 @@ npm run lint
 npm run build
 ```
 
+Prova visual opcional (Edge instal·lat, frontend ja compilat):
+
+```powershell
+backend\.venv\Scripts\python.exe -m pip install playwright
+backend\.venv\Scripts\python.exe scripts\check_adventure_ui.py
+# Regenerar les captures del README amb dades de mostra temporals:
+backend\.venv\Scripts\python.exe scripts\check_adventure_ui.py --screenshots
+```
+
+La prova obre un servidor i un navegador ocults, crea una base temporal i els tanca al final; no utilitza `data/campaign.db` ni els teus documents. La suite backend inclou 37 proves; el recorregut visual comprova controls reals, persistència, privacitat i amplada mòbil.
+
 ## Arquitectura
 
 ```text
@@ -224,9 +266,9 @@ La base de dades és la font de veritat. El LLM rep només el context rellevant 
 
 ## Abast actual i roadmap
 
-La versió 1.1 completa el motor local de campanyes amb plantilles, NPC actius, downtime revisable, el flux document → fragment → aprovació → coneixement canònic i les utilitats de daus i condicions per dirigir una sessió. Tot funciona sense Azure ni connexió a Internet i es pot ocultar per mòduls.
+La versió 1.4 connecta la preparació amb la direcció de partides: aventures persistents, combats mixtos per onades, vincles amb l'hexcrawl, notes i tirades a taula. Conserva el catàleg SRD i el Laboratori de selva de les versions anteriors. Tot aquest nucli funciona sense Azure ni connexió a Internet i es pot ocultar per mòduls.
 
-Queden com a ampliacions opcionals l'OCR local per a PDF escanejat, la cerca semàntica amb embeddings locals, l'empaquetat desktop i la sincronització remota. Cap d'aquestes peces és necessària per utilitzar el nucli actual.
+Queden com a ampliacions opcionals l'edició/reordenació d'aventures ja desades, les bifurcacions entre escenes, l'automatització específica de cada minijoc, l'OCR local per a PDF escanejat, la cerca semàntica local, l'empaquetat desktop i la sincronització remota. Cap d'aquestes peces és necessària per utilitzar el nucli actual.
 
 El botó de controls de la capçalera obre les [preferències de la interfície](docs/ui-settings.md). Es pot simplificar el menú per sessió sense eliminar dades ni afectar altres navegadors.
 

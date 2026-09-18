@@ -432,10 +432,13 @@ class CharacterUpdate(BaseModel):
     death_saves_failure: int | None = Field(default=None, ge=0, le=3)
 
 
+CampaignRecordKind = Literal["quest", "calendar", "clock", "scene", "map", "marker", "library_link", "adventure"]
+
+
 class CampaignRecord(BaseModel):
     id: str
     campaign_id: str
-    kind: Literal["quest", "calendar", "clock", "scene", "map", "marker", "library_link"]
+    kind: CampaignRecordKind
     title: str
     status: str = "active"
     visibility: Literal["dm", "players", "world"] = "dm"
@@ -448,7 +451,7 @@ class CampaignRecord(BaseModel):
 
 class CampaignRecordCreate(BaseModel):
     campaign_id: str = "demo"
-    kind: Literal["quest", "calendar", "clock", "scene", "map", "marker", "library_link"]
+    kind: CampaignRecordKind
     title: str = Field(min_length=2, max_length=200)
     status: str = Field(default="active", max_length=40)
     visibility: Literal["dm", "players", "world"] = "dm"
@@ -464,6 +467,45 @@ class CampaignRecordUpdate(BaseModel):
     due_day: int | None = Field(default=None, ge=1)
     linked_id: str | None = None
     data: dict | None = None
+
+
+class AdventureEnemyGroup(BaseModel):
+    resource_id: str = Field(min_length=3, max_length=300)
+    quantity: int = Field(default=1, ge=1, le=20)
+    wave: int = Field(default=1, ge=1, le=5)
+
+
+class AdventureCreate(BaseModel):
+    campaign_id: str = "demo"
+    title: str = Field(min_length=2, max_length=200)
+    description: str = Field(default="", max_length=5000)
+    visibility: Literal["dm", "players", "world"] = "dm"
+    hex_id: str | None = None
+    location_id: str | None = None
+    situation_id: str | None = Field(default=None, max_length=300)
+    temple_id: str | None = Field(default=None, max_length=300)
+    minigame_id: str | None = Field(default=None, max_length=300)
+    enemy_groups: list[AdventureEnemyGroup] = Field(default_factory=list, max_length=12)
+    alert_delta: int = Field(default=1, ge=0, le=5)
+    include_characters: bool = True
+
+
+class AdventureActivate(BaseModel):
+    force: bool = False
+
+
+class AdventureAdvance(BaseModel):
+    expected_revision: int = Field(ge=0)
+    force: bool = False
+    note: str = Field(default="", max_length=2000)
+    check_index: int = Field(default=0, ge=0, le=29)
+    d20: int | None = Field(default=None, ge=1, le=20)
+    modifier: int = Field(default=0, ge=-20, le=30)
+
+
+class AdventureBudget(BaseModel):
+    campaign_id: str = "demo"
+    enemy_groups: list[AdventureEnemyGroup] = Field(default_factory=list, max_length=12)
 
 
 class CampaignActivity(BaseModel):

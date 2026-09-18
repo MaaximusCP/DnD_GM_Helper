@@ -59,3 +59,9 @@ Un rumor mai es converteix automàticament en una veritat del món. En propagar-
 ## Motors de generació
 
 `GenerationService` resol el terreny a partir del valor forçat pel DM o de la localització. Després filtra les entrades per campanya, tipus de taula, terreny, nivell i dificultat, i aplica el pes configurat. La selecció i els motius queden persistits per poder auditar el resultat.
+
+## Aventures i trobades mixtes (1.4)
+
+`AdventureService` conserva plans versionats dins `campaign_records` amb tipus `adventure`. Valida els vincles de campanya i desa còpies dels recursos seleccionats. Cada transició, activitat i canvi de combat s'executa en una sola transacció `BEGIN IMMEDIATE`; una revisió esperada evita executar dues vegades la mateixa acció. Els combats es creen quan s'arriba a l'escena, no en preparar el pla. Les onades s'activen separadament sense canviar qui té el torn actual.
+
+El pressupost es calcula al servidor amb llindars 2014 i nivells individuals. `AdventureStudio` separa preparació i direcció de sessió, amb controls avançats plegables. El tipus `adventure` no s'exporta a la vista dels jugadors. Les aventures sí viatgen dins l'exportació privada de campanya, amb el seu progrés i els vincles a combats. Vegeu [el contracte i els límits](adventures.md).

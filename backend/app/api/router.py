@@ -1,10 +1,12 @@
 from pathlib import Path
+import json
 import secrets
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse
 
 from app.application.context_builder import ContextBuilder
+from app.application.adventure_service import AdventureService, AdventureConflict
 from app.application.campaign_template_service import CampaignTemplateService
 from app.application.event_service import EventService
 from app.application.backup_service import BackupService
@@ -17,6 +19,7 @@ from app.application.rest_service import RestService
 from app.application.travel_service import TravelService
 from app.config import Settings, get_settings
 from app.domain.models import (
+    AdventureCreate, AdventureActivate, AdventureAdvance, AdventureBudget,
     CampaignBundle, CampaignCreate, CampaignTemplateCreate, CampaignUpdate, EventAnalyzeRequest, EventProposal,
     EventUpdate, FactionCreate, FactionUpdate, LocationCreate, LocationUpdate,
     MemoryCreate, NPCCreate, NPCChatRequest,
@@ -78,6 +81,53 @@ def get_operations_repository(settings: Settings = Depends(get_settings)) -> Ope
 
 def get_homebrew_catalog(settings: Settings = Depends(get_settings)) -> HomebrewCatalog:
     return HomebrewCatalog(settings.homebrew_path)
+
+
+def get_adventure_service(settings: Settings = Depends(get_settings)) -> AdventureService:
+    return AdventureService(Database(settings.database_path), HomebrewCatalog(settings.homebrew_path))
+
+
+def adventure_result(action):
+    try:
+        return action()
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except AdventureConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.get("/adventures/resources")
+def adventure_resources(service: AdventureService = Depends(get_adventure_service)):
+    return service.resources()
+
+
+@router.get("/adventures/templates")
+def adventure_templates():
+    return json.loads((Path(__file__).resolve().parents[1] / "data" / "adventure_templates.json").read_text(encoding="utf-8"))
+
+
+@router.post("/adventures/budget")
+def adventure_budget(payload: AdventureBudget, service: AdventureService = Depends(get_adventure_service)):
+    return adventure_result(lambda: service.preview(payload))
+
+
+@router.post("/adventures", status_code=201)
+def create_adventure(payload: AdventureCreate, service: AdventureService = Depends(get_adventure_service)):
+    return adventure_result(lambda: service.create(payload))
+
+
+@router.post("/adventures/{item_id}/activate")
+def activate_adventure(item_id: str, payload: AdventureActivate, service: AdventureService = Depends(get_adventure_service)):
+    return adventure_result(lambda: service.activate(item_id, payload.force))
+
+
+@router.post("/adventures/{item_id}/{action}")
+def advance_adventure(item_id: str, action: str, payload: AdventureAdvance, service: AdventureService = Depends(get_adventure_service)):
+    if action not in {"advance", "wave", "note", "check"}:
+        raise HTTPException(404, "Acció desconeguda")
+    return adventure_result(lambda: service.transition(item_id, payload, action))
 
 
 def _add_reference_combatants(repository: CampaignToolsRepository, combat_id: str,
@@ -288,6 +338,8 @@ def list_campaign_records(campaign_id: str = "demo", kind: str | None = None,
 def create_campaign_record(payload: CampaignRecordCreate,
                            world: SQLiteRepository = Depends(get_repository),
                            repository: OperationsRepository = Depends(get_operations_repository)):
+    if payload.kind == "adventure":
+        raise HTTPException(409, "Utilitza el constructor d'aventures")
     if not world.get_campaign(payload.campaign_id):
         raise HTTPException(status_code=404, detail="Campanya no trobada")
     return repository.create_record(payload)
@@ -296,6 +348,9 @@ def create_campaign_record(payload: CampaignRecordCreate,
 @router.patch("/campaign-records/{item_id}")
 def update_campaign_record(item_id: str, payload: CampaignRecordUpdate,
                            repository: OperationsRepository = Depends(get_operations_repository)):
+    current = repository.get_record(item_id)
+    if current and current.kind == "adventure":
+        raise HTTPException(409, "Utilitza les transicions d'aventura")
     item = repository.update_record(item_id, payload)
     if not item:
         raise HTTPException(status_code=404, detail="Element no trobat")
@@ -305,6 +360,9 @@ def update_campaign_record(item_id: str, payload: CampaignRecordUpdate,
 @router.delete("/campaign-records/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_campaign_record(item_id: str, confirm: bool = False,
                            repository: OperationsRepository = Depends(get_operations_repository)):
+    current = repository.get_record(item_id)
+    if current and current.kind == "adventure" and current.status == "active":
+        raise HTTPException(409, "Finalitza l'aventura abans d'eliminar-la")
     if not confirm:
         raise HTTPException(status_code=409, detail="Cal confirm=true")
     if not repository.delete_record(item_id):
@@ -314,6 +372,9 @@ def delete_campaign_record(item_id: str, confirm: bool = False,
 
 @router.post("/campaign-records/{item_id}/duplicate", status_code=status.HTTP_201_CREATED)
 def duplicate_campaign_record(item_id: str, repository: OperationsRepository = Depends(get_operations_repository)):
+    current = repository.get_record(item_id)
+    if current and current.kind == "adventure":
+        raise HTTPException(409, "Crea una aventura nova des del constructor")
     item = repository.duplicate_record(item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Element no trobat")
